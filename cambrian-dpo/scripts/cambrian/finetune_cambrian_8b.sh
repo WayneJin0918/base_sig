@@ -1,19 +1,18 @@
-#!/bin/bash
 
-export PJRT_DEVICE=TPU &&
-export XLA_USE_BF16=0 &&
-export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune" &&
+# export PJRT_DEVICE=TPU &&
+# export XLA_USE_BF16=0 &&
+# export WANDB_RESUME="allow" &&
+# export CKPT_NAME="cambrian-8b-finetune" &&
 
-export CKPT_DIR="gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME" &&
+# export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path your_path_to_llama3 \
+    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/cambrian/cambrian-8b \
     --version llama_v3 \
-    --data_path your_path_to_pretrain_jsonl e.g. Cambrian7M_withsystemprompt.jsonl \
-    --image_folder your_path_to_image_folder \
-    --pretrain_mm_mlp_adapter ./checkpoints/cambrian-8b-pretrain/mm_projector.bin \
+    --data_path /home/wayneyjin/model_ckpt/cambrian-8b-finetune/Cambrian-10M/jsons/datasets--nyu-visionx--Cambrian-10M/snapshots/a087b9234c59bc6c64e7e4a091a6a618cb887132/jsons/Cambrian737k.jsonl \
+    --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
+    --pretrain_mm_mlp_adapter /home/wayneyjin/model_ckpt/cambrian-8b-pretrain/mm_projector.bin \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384", "openai/clip-vit-large-patch14-336", "facebook/dinov2-giant-res378", "clip-convnext-XXL-multi-stage"]' \
     --vision_tower_aux_token_len_list '[576, 576, 576, 9216]' \
     --image_token_len 576 \
@@ -33,15 +32,15 @@ python cambrian/train/train_tpu.py \
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
-    --bf16 False \
+    --bf16 True \
     --output_dir $CKPT_DIR \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 2000 \
+    --save_steps 3000 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
@@ -51,7 +50,7 @@ python cambrian/train/train_tpu.py \
     --tf32 False \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 2 \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
