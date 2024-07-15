@@ -2,9 +2,9 @@
 # export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-# export CKPT_NAME="cambrian-8b-finetune" &&
+export CKPT_NAME="cambrian-8b-finetune" &&
 
-# export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
+export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
