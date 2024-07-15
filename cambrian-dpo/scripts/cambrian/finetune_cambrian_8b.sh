@@ -10,7 +10,7 @@
 python cambrian/train/train_tpu.py \
     --model_name_or_path /home/wayneyjin/weiyangrl-bucket/cambrian/cambrian-8b \
     --version llama_v3 \
-    --data_path /home/wayneyjin/model_ckpt/cambrian-8b-finetune/Cambrian-10M/jsons/datasets--nyu-visionx--Cambrian-10M/snapshots/a087b9234c59bc6c64e7e4a091a6a618cb887132/jsons/Cambrian737k.jsonl \
+    --data_path /home/wayneyjin/Cambrian7M.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
     --pretrain_mm_mlp_adapter /home/wayneyjin/model_ckpt/cambrian-8b-pretrain/mm_projector.bin \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384", "openai/clip-vit-large-patch14-336", "facebook/dinov2-giant-res378", "clip-convnext-XXL-multi-stage"]' \
@@ -35,8 +35,8 @@ python cambrian/train/train_tpu.py \
     --bf16 True \
     --output_dir $CKPT_DIR \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 1 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 8 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
