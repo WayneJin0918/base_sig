@@ -1081,10 +1081,10 @@ class LazySupervisedDataset(Dataset):
             labels_tensor = torch.tensor(processed_text["labels"], dtype=torch.long).clone().detach()
         else:
             labels_tensor = processed_text["labels"].clone().detach().long()
-
+            
         if 'image' not in sources:
             processor_aux_list = self.data_args.image_processor_aux_list
-            
+        
             if self.previous_image is not None and self.previous_image != 0:
                 image = self.previous_image
             else:
@@ -1095,17 +1095,16 @@ class LazySupervisedDataset(Dataset):
             noise_levels = [0, 30, 50]
             noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
             
-            for processor_aux in processor_aux_list:
+            for idx, img in enumerate(noisy_images_with_levels):
                 image_aux_list = []
-                for idx, img in enumerate(noisy_images_with_levels):
+                for processor_aux in processor_aux_list:
                     # Process each noisy image with the current processor_aux
-                    target_resolution = processor_aux.crop_size['height']
                     noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)
+                    image_aux_list.append(noisy_image_tensor)
                     
-                    # Add processed image to data_dict
-                    data_dict['image'].append(noisy_image_tensor)
-                    data_dict['input_ids'].append(input_ids_tensor)
-                    data_dict['labels'].append(labels_tensor)
+                data_dict['image_aux_list'].append(image_aux_list)
+                data_dict['input_ids'].append(input_ids_tensor)
+                data_dict['labels'].append(labels_tensor)
                 
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         else:
@@ -1120,30 +1119,40 @@ class LazySupervisedDataset(Dataset):
             noise_levels = self.noise_levels
             noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
             
-            for processor_aux in processor_aux_list:
-                for idx, img in enumerate(noisy_images_with_levels):
+            for idx, img in enumerate(noisy_images_with_levels):
+                image_aux_list = []
+                for processor_aux in processor_aux_list:
                     # Process each noisy image with the current processor_aux
-                    target_resolution = processor_aux.crop_size['height']
                     noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)
+                    image_aux_list.append(noisy_image_tensor)
                     
-                    data_dict['image'].append(noisy_image_tensor)
-                    data_dict['input_ids'].append(input_ids_tensor)
-                    data_dict['labels'].append(labels_tensor)
+                data_dict['image_aux_list'].append(image_aux_list)
+                data_dict['input_ids'].append(input_ids_tensor)
+                data_dict['labels'].append(labels_tensor)
                 
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
         data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
-        if 'image' in data_dict:
-            if isinstance(data_dict['image'], list) and data_dict['image']:
-                data_dict['image'] = torch.stack(data_dict['image'])
-            elif isinstance(data_dict['image'], torch.Tensor) and data_dict['image'].nelement() > 0:
-                # If it's already a tensor with elements, use it as it is
-                data_dict['image'] = data_dict['image']
-            else:
-                data_dict['image'] = torch.tensor([])
-        else:
-            data_dict['image'] = torch.tensor([])
+        data_dict = preprocess(
+            sources,
+            self.tokenizer,
+            has_image=has_image)
+        if isinstance(i, int):
+            data_dict = dict(input_ids=data_dict["input_ids"][0],
+                             labels=data_dict["labels"][0])
+        if (data_dict['labels']!=IGNORE_INDEX).sum()==0:
+            return self.__getitem__(0)
+        # image exist in the data
+        if has_image:
+            data_dict['image_aux_list'] = image_aux_list
+        elif self.data_args.is_multimodal:
+            # image does not exist in the data, but the model is multimodal
+            crop_size = 336
+            processor_aux_list = self.data_args.image_processor_aux_list
+            data_dict['image_aux_list'] = [torch.zeros(3, processor_aux.crop_size['height'], processor_aux.crop_size['width']) for processor_aux in processor_aux_list]
+            image_size = (crop_size, crop_size)
+        data_dict['image_size'] = image_size
         data_dict['noise_level'] = torch.stack(data_dict['noise_level']) if 'noise_level' in data_dict and data_dict['noise_level'] else torch.tensor([])
         return data_dict
 
