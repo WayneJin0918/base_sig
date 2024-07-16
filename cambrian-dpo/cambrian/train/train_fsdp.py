@@ -1038,6 +1038,24 @@ class LazySupervisedDataset(Dataset):
         target_resolution = processor.crop_size['height']
         pil_img = pil_img.resize((target_resolution, target_resolution))
         return processor.preprocess(pil_img, return_tensors='pt')['pixel_values'][0]
+        
+    def adjust_image_aux_list_shapes(self, image_aux_list):
+        """
+        调整image_aux_list中张量的形状，去除中间维度。
+    
+        参数:
+            image_aux_list (list of list of torch.Tensor): 每个元素都是形状为[4, 1, N]的张量列表。
+    
+        返回:
+            list of torch.Tensor: 调整后形状为[4*N]的张量列表。
+        """
+        adjusted_tensors = []
+        for aux_list in image_aux_list:
+            for tensor in aux_list:
+                squeezed_tensor = tensor.squeeze(1)
+                for i in range(squeezed_tensor.size(0)):
+                    adjusted_tensors.append(squeezed_tensor[i])
+        return torch.stack(adjusted_tensors)
 
     def adjust_tensor_shapes(self, tensor_list):
         """
@@ -1105,6 +1123,7 @@ class LazySupervisedDataset(Dataset):
                     image_aux_list.append(noisy_image_tensor)
                     
                 data_dict['image_aux_list'].append(image_aux_list)
+                
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
                 data_dict['image_size'].append(image_size)
@@ -1137,18 +1156,7 @@ class LazySupervisedDataset(Dataset):
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
         data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
-        # data_dict['image_size'] = self.adjust_tensor_shapes(data_dict['image_size'])
-        
-        if 'image' in data_dict:
-            if isinstance(data_dict['image_aux_list'], list) and data_dict['image_aux_list']:
-                data_dict['image_aux_list'] = torch.stack(data_dict['image_aux_list'])
-            elif isinstance(data_dict['image_aux_list'], torch.Tensor) and data_dict['image_aux_list'].nelement() > 0:
-                # If it's already a tensor with elements, use it as it is
-                data_dict['image_aux_list'] = data_dict['image_aux_list']
-            else:
-                data_dict['image_aux_list'] = torch.tensor([])
-        else:
-            data_dict['image_aux_list'] = torch.tensor([])
+        data_dict['image_aux_list'] = self.adjust_image_aux_list_shapes(data_dict['image_aux_list'])
         
         data_dict['noise_level'] = torch.stack(data_dict['noise_level']) if 'noise_level' in data_dict and data_dict['noise_level'] else torch.tensor([])
         return data_dict
@@ -1327,7 +1335,6 @@ class DataCollatorForSupervisedDataset(object):
         input_ids = [item for sublist in input_ids for item in sublist]
         labels = [item for sublist in labels for item in sublist]
         noise_levels = [item for sublist in noise_levels for item in sublist]
-        print(input_ids,"id")
         input_ids = torch.nn.utils.rnn.pad_sequence(
             input_ids,
             batch_first=True,
