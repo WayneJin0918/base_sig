@@ -1394,6 +1394,26 @@ class DataCollatorForSupervisedDataset(object):
         #         batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
         #     else:
         #         batch['images'] = image_aux_list
+        
+        # if 'image_aux_list' in instances[0]:
+        #     # 提取每个实例的image_aux_list
+        #     all_image_aux_lists = [instance['image_aux_list'] for instance in instances]
+            
+        #     # 转置all_image_aux_lists，使得每个新的列表包含相同位置的所有图像辅助数据
+        #     transposed_image_aux_lists = [list(batch_image_aux) for batch_image_aux in zip(*all_image_aux_lists)]
+            
+        #     # 处理每个位置的图像辅助数据
+        #     batch_images = []
+        #     for image_aux_list in transposed_image_aux_lists:
+        #         # 检查所有图像是否具有相同的形状
+        #         if all(x is not None and x.shape == image_aux_list[0].shape for x in image_aux_list):
+        #             batch_images.append(torch.stack(image_aux_list))
+        #         else:
+        #             batch_images.append(image_aux_list)
+            
+        #     # 将处理后的图像数据添加到batch中
+        #     batch['images'] = batch_images
+            
         if 'image_aux_list' in instances[0]:
             # 提取每个实例的image_aux_list
             all_image_aux_lists = [instance['image_aux_list'] for instance in instances]
@@ -1403,12 +1423,11 @@ class DataCollatorForSupervisedDataset(object):
             
             # 处理每个位置的图像辅助数据
             batch_images = []
-            for image_aux_list in transposed_image_aux_lists:
-                # 检查所有图像是否具有相同的形状
-                if all(x is not None and x.shape == image_aux_list[0].shape for x in image_aux_list):
-                    batch_images.append(torch.stack(image_aux_list))
-                else:
-                    batch_images.append(image_aux_list)
+            for image_aux_lists in transposed_image_aux_lists:
+                # 转置每个image_aux_lists，使得每个新的列表包含相同位置的张量
+                transposed_aux_lists = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_lists)]
+                stacked_aux_lists = [torch.stack(image_aux) for image_aux in transposed_aux_lists]
+                batch_images.append(stacked_aux_lists)
             
             # 将处理后的图像数据添加到batch中
             batch['images'] = batch_images
