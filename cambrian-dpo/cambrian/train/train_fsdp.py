@@ -1137,7 +1137,7 @@ class LazySupervisedDataset(Dataset):
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
         data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
-        data_dict['image_size'] = self.adjust_tensor_shapes(data_dict['image_size'])
+        # data_dict['image_size'] = self.adjust_tensor_shapes(data_dict['image_size'])
         
         if 'image' in data_dict:
             if isinstance(data_dict['image_aux_list'], list) and data_dict['image_aux_list']:
