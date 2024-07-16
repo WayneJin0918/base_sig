@@ -1107,7 +1107,7 @@ class LazySupervisedDataset(Dataset):
                 data_dict['image_aux_list'].append(image_aux_list)
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
-                data_dict['image_size'] = torch.tensor(image_size, dtype=torch.float)
+                data_dict['image_size'] = data_dict['image_size'].append(image_size)
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         else:
             # 加载并处理图像
@@ -1132,7 +1132,7 @@ class LazySupervisedDataset(Dataset):
                 data_dict['image_aux_list'].append(image_aux_list)
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
-                data_dict['image_size'] = torch.tensor(image_size, dtype=torch.float)
+                data_dict['image_size'] = data_dict['image_size'].append(image_size)
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
@@ -1216,7 +1216,8 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, imag
         num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
         assert num_images == 1, num_images
         image_size = image_sizes[batch_idx]
-        
+        if isinstance(image_size, torch.Tensor):
+            image_size = (int(image_size[0].item()), int(image_size[1].item()))
         image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
 
         cur_input_ids_im_replaced = []
