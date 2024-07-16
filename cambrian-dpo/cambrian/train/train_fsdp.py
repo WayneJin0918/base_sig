@@ -1058,7 +1058,7 @@ class LazySupervisedDataset(Dataset):
         return torch.stack(adjusted_tensors)
 
     def __getitem__(self, i) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
-        sources = self.list_data_dict[i]
+        sources = self.data_path[i]
         data_dict = {'input_ids': [], 'labels': [], 'image': [], 'noise_level': []}
 
         # 假设preprocess函数处理文本并返回Tensor
