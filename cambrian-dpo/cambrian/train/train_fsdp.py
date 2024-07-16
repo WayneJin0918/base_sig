@@ -1150,20 +1150,19 @@ class LazySupervisedDataset(Dataset):
                 data_dict['image_size'].append(image_size)
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         
-        if 'image_aux_list' in data_dict:
-            if isinstance(data_dict['image_aux_list'], list) and data_dict['image_aux_list']:
-                data_dict['image_aux_list'] = torch.stack(data_dict['image_aux_list'])
-            elif isinstance(data_dict['image_aux_list'], torch.Tensor) and data_dict['image_aux_list'].nelement() > 0:
-                # If it's already a tensor with elements, use it as it is
-                data_dict['image_aux_list'] = data_dict['image_aux_list']
-            else:
-                data_dict['image_aux_list'] = torch.tensor([])
-        else:
-            data_dict['image_aux_list'] = torch.tensor([])
+        # if 'image_aux_list' in data_dict:
+        #     if isinstance(data_dict['image_aux_list'], list) and data_dict['image_aux_list']:
+        #         data_dict['image_aux_list'] = data_dict['image_aux_list']
+        #     elif isinstance(data_dict['image_aux_list'], torch.Tensor) and data_dict['image_aux_list'].nelement() > 0:
+        #         # If it's already a tensor with elements, use it as it is
+        #         data_dict['image_aux_list'] = data_dict['image_aux_list']
+        #     else:
+        #         data_dict['image_aux_list'] = torch.tensor([])
+        # else:
+        #     data_dict['image_aux_list'] = torch.tensor([])
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
         data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
-        data_dict['image_aux_list'] = self.adjust_image_aux_list_shapes(data_dict['image_aux_list'])
         
         data_dict['noise_level'] = torch.stack(data_dict['noise_level']) if 'noise_level' in data_dict and data_dict['noise_level'] else torch.tensor([])
         return data_dict
