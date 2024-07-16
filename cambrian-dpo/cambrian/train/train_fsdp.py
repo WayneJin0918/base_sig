@@ -1337,8 +1337,6 @@ class DataCollatorForSupervisedDataset(object):
         input_ids = input_ids[:, :max_length]
         labels = labels[:, :max_length]
         
-        input_ids = torch.stack(input_ids)
-        labels = torch.stack(labels)
         attention_mask = input_ids.ne(self.tokenizer.pad_token_id)
 
         for i in range(len(input_ids)):
