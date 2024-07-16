@@ -1305,19 +1305,40 @@ class DataCollatorForSupervisedDataset(object):
         image_aux_token_len_list = self.image_aux_token_len_list
         image_position = self.image_position
 
-        input_ids, labels = tuple([instance[key] for instance in instances]
-                                  for key in ("input_ids", "labels"))
+        # input_ids, labels = tuple([instance[key] for instance in instances]
+        #                           for key in ("input_ids", "labels"))
         max_length = self.tokenizer.model_max_length
 
         padding_side = self.tokenizer.padding_side 
 
-        if padding_side == "left":
-            input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (max_length - t.shape[0], 0), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
-            labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, ( max_length - t.shape[0], 0), 'constant', IGNORE_INDEX) for t in labels]
-        else:
-            input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (0, max_length - t.shape[0]), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
-            labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (0, max_length - t.shape[0]), 'constant', IGNORE_INDEX) for t in labels]
+        # if padding_side == "left":
+        #     input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (max_length - t.shape[0], 0), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
+        #     labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, ( max_length - t.shape[0], 0), 'constant', IGNORE_INDEX) for t in labels]
+        # else:
+        #     input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (0, max_length - t.shape[0]), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
+        #     labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (0, max_length - t.shape[0]), 'constant', IGNORE_INDEX) for t in labels]
 
+        input_ids = [instance['input_ids'] for instance in instances]
+        labels = [instance['labels'] for instance in instances]
+        images = [instance['image'] for instance in instances]
+        noise_levels = [instance['noise_level'] for instance in instances]
+
+        # Flatten lists of tensors
+        input_ids = [item for sublist in input_ids for item in sublist]
+        labels = [item for sublist in labels for item in sublist]
+        images = [item for sublist in images for item in sublist]
+        noise_levels = [item for sublist in noise_levels for item in sublist]
+
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            input_ids,
+            batch_first=True,
+            padding_value=self.tokenizer.pad_token_id)
+        labels = torch.nn.utils.rnn.pad_sequence(labels,
+                                                 batch_first=True,
+                                                 padding_value=IGNORE_INDEX)
+        input_ids = input_ids[:, :max_length]
+        labels = labels[:, :max_length]
+        
         input_ids = torch.stack(input_ids)
         labels = torch.stack(labels)
         attention_mask = input_ids.ne(self.tokenizer.pad_token_id)
