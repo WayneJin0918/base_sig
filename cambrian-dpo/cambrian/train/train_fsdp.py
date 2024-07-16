@@ -1084,13 +1084,15 @@ class LazySupervisedDataset(Dataset):
             
         if 'image' not in sources:
             processor_aux_list = self.data_args.image_processor_aux_list
-        
+            
             if self.previous_image is not None and self.previous_image != 0:
                 image = self.previous_image
+                image_size = image.size
             else:
                 # Construct a blank image sample (e.g., a white image)
                 blank_image = Image.new("RGB", (224, 224), color=(255, 255, 255))
                 image = blank_image.convert("RGB")
+                image_size = image.size
                 
             noise_levels = [0, 30, 50]
             noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
@@ -1109,6 +1111,7 @@ class LazySupervisedDataset(Dataset):
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         else:
             # 加载并处理图像
+            image_size = image.size
             image_file = sources['image']
             image_folder = self.data_args.image_folder
             processor_aux_list = self.data_args.image_processor_aux_list
