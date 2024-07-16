@@ -1111,12 +1111,13 @@ class LazySupervisedDataset(Dataset):
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         else:
             # 加载并处理图像
-            image_size = image.size
+=
             image_file = sources['image']
             image_folder = self.data_args.image_folder
             processor_aux_list = self.data_args.image_processor_aux_list
             image_path = os.path.join(image_folder, image_file)
             image = Image.open(image_path).convert('RGB')
+            image_size = image.size
             self.previous_image = image
             
             noise_levels = self.noise_levels
