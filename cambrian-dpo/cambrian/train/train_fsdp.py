@@ -1080,50 +1080,59 @@ class LazySupervisedDataset(Dataset):
         else:
             labels_tensor = processed_text["labels"].clone().detach().long()
 
-
         if 'image' not in sources:
-            # 对于没有图像的样本，直接添加处理后的文本数据
-            processor = self.data_args.image_processor_aux_list
+            processor_aux_list = self.data_args.image_processor_aux_list
+            
             if self.previous_image is not None and self.previous_image != 0:
                 image = self.previous_image
             else:
                 # Construct a blank image sample (e.g., a white image)
                 blank_image = Image.new("RGB", (224, 224), color=(255, 255, 255))
                 image = blank_image.convert("RGB")
-            noise_levels = [0,30,50]
-            noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
-            for idx, img in enumerate(noisy_images_with_levels):
-                noisy_image_tensor = self.preprocess_and_pad_image(img, processor)
-                # data_dict['image'].append(pure_image_tensor)
-
-                data_dict['image'].append(noisy_image_tensor)
-                # data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
                 
-                # # # 为每个噪声图像添加相同的文本数据
-                data_dict['input_ids'].append(input_ids_tensor)
-                data_dict['labels'].append(labels_tensor)
-            data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+            noise_levels = [0, 30, 50]
+            noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
+            
+            for processor_aux in processor_aux_list:
+                image_aux_list = []
+                for idx, img in enumerate(noisy_images_with_levels):
+                    # Process each noisy image with the current processor_aux
+                    target_resolution = processor_aux.crop_size['height']
+                    img = expand2square(img, tuple(int(x*255) for x in processor_aux.image_mean)).resize((target_resolution, target_resolution))
+                    image_aux = processor_aux.preprocess(img, return_tensors='pt')['pixel_values'][0]
+                    
+                    image_aux_list.append(image_aux)
+                    
+                    # Add processed image to data_dict
+                    data_dict['image'].append(image_aux)
+                    data_dict['input_ids'].append(input_ids_tensor)
+                    data_dict['labels'].append(labels_tensor)
+                
+                data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         else:
             # 加载并处理图像
             image_file = sources['image']
             image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor_aux_list
+            processor_aux_list = self.data_args.image_processor_aux_list
             image_path = os.path.join(image_folder, image_file)
             image = Image.open(image_path).convert('RGB')
             self.previous_image = image
+            
             noise_levels = self.noise_levels
             noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
-            for idx, img in enumerate(noisy_images_with_levels):
-                noisy_image_tensor = self.preprocess_and_pad_image(img, processor)
-                # data_dict['image'].append(pure_image_tensor)
-
-                data_dict['image'].append(noisy_image_tensor)
-                # data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+            
+            for processor_aux in processor_aux_list:
+                for idx, img in enumerate(noisy_images_with_levels):
+                    # Process each noisy image with the current processor_aux
+                    target_resolution = processor_aux.crop_size['height']
+                    img = expand2square(img, tuple(int(x*255) for x in processor_aux.image_mean)).resize((target_resolution, target_resolution))
+                    noisy_image_tensor = processor_aux.preprocess(img, return_tensors='pt')['pixel_values'][0]
+                    
+                    data_dict['image'].append(noisy_image_tensor)
+                    data_dict['input_ids'].append(input_ids_tensor)
+                    data_dict['labels'].append(labels_tensor)
                 
-                # # # 为每个噪声图像添加相同的文本数据
-                data_dict['input_ids'].append(input_ids_tensor)
-                data_dict['labels'].append(labels_tensor)
-            data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+                data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
         data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
