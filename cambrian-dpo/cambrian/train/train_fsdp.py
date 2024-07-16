@@ -1116,10 +1116,12 @@ class LazySupervisedDataset(Dataset):
             noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
             
             for idx, img in enumerate(noisy_images_with_levels):
+                image_aux_list = []
                 for processor_aux in processor_aux_list:
                     # Process each noisy image with the current processor_aux
-                    noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)                    
-                    data_dict['image_aux_list'].append(noisy_image_tensor)
+                    noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)
+                    image_aux_list.append(noisy_image_tensor)
+                data_dict['image_aux_list'].append(image_aux_list)
                 
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
@@ -1143,7 +1145,8 @@ class LazySupervisedDataset(Dataset):
                 for processor_aux in processor_aux_list:
                     # Process each noisy image with the current processor_aux
                     noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)
-                    data_dict['image_aux_list'].append(noisy_image_tensor)
+                    image_aux_list.append(noisy_image_tensor)
+                data_dict['image_aux_list'].append(image_aux_list)
                     
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
@@ -1391,10 +1394,24 @@ class DataCollatorForSupervisedDataset(object):
         #         batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
         #     else:
         #         batch['images'] = image_aux_list
-        images = [instance['image_aux_list'] for instance in instances]
-        images = [item for sublist in images for item in sublist]
-        if images:
-            batch['images'] = torch.stack(images)
+        if 'image_aux_list' in instances[0]:
+            # 提取每个实例的image_aux_list
+            all_image_aux_lists = [instance['image_aux_list'] for instance in instances]
+            
+            # 转置all_image_aux_lists，使得每个新的列表包含相同位置的所有图像辅助数据
+            transposed_image_aux_lists = [list(batch_image_aux) for batch_image_aux in zip(*all_image_aux_lists)]
+            
+            # 处理每个位置的图像辅助数据
+            batch_images = []
+            for image_aux_list in transposed_image_aux_lists:
+                # 检查所有图像是否具有相同的形状
+                if all(x is not None and x.shape == image_aux_list[0].shape for x in image_aux_list):
+                    batch_images.append(torch.stack(image_aux_list))
+                else:
+                    batch_images.append(image_aux_list)
+            
+            # 将处理后的图像数据添加到batch中
+            batch['images'] = batch_images
             
         if 'noise_level' in instances[0]:
             noise_levels = [instance['noise_level'] for instance in instances]
