@@ -1065,7 +1065,7 @@ class LazySupervisedDataset(Dataset):
                 if idx == i:
                     sources = json.loads(line.strip())
                     break
-        data_dict = {'input_ids': [], 'labels': [], 'image': [], 'noise_level': []}
+        data_dict = {'input_ids': [], 'labels': [], 'image_aux_list': [], 'noise_level': [],'image_size'}
 
         # 假设preprocess函数处理文本并返回Tensor
         processed_text = preprocess([e["conversations"] for e in [sources]],
@@ -1105,7 +1105,7 @@ class LazySupervisedDataset(Dataset):
                 data_dict['image_aux_list'].append(image_aux_list)
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
-                
+                data_dict['image_size'] = torch.tensor(image_size, dtype=torch.float))
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         else:
             # 加载并处理图像
@@ -1129,30 +1129,24 @@ class LazySupervisedDataset(Dataset):
                 data_dict['image_aux_list'].append(image_aux_list)
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
-                
+                data_dict['image_size'] = torch.tensor(image_size, dtype=torch.float))
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
         data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
-        data_dict = preprocess(
-            sources,
-            self.tokenizer,
-            has_image=has_image)
-        if isinstance(i, int):
-            data_dict = dict(input_ids=data_dict["input_ids"][0],
-                             labels=data_dict["labels"][0])
-        if (data_dict['labels']!=IGNORE_INDEX).sum()==0:
-            return self.__getitem__(0)
-        # image exist in the data
-        if has_image:
-            data_dict['image_aux_list'] = image_aux_list
-        elif self.data_args.is_multimodal:
-            # image does not exist in the data, but the model is multimodal
-            crop_size = 336
-            processor_aux_list = self.data_args.image_processor_aux_list
-            data_dict['image_aux_list'] = [torch.zeros(3, processor_aux.crop_size['height'], processor_aux.crop_size['width']) for processor_aux in processor_aux_list]
-            image_size = (crop_size, crop_size)
-        data_dict['image_size'] = image_size
+        data_dict['image_size'] = self.adjust_tensor_shapes(data_dict['image_size'])
+        
+        if 'image' in data_dict:
+            if isinstance(data_dict['image_aux_list'], list) and data_dict['image_aux_list']:
+                data_dict['image_aux_list'] = torch.stack(data_dict['image_aux_list'])
+            elif isinstance(data_dict['image_aux_list'], torch.Tensor) and data_dict['image_aux_list'].nelement() > 0:
+                # If it's already a tensor with elements, use it as it is
+                data_dict['image_aux_list'] = data_dict['image_aux_list']
+            else:
+                data_dict['image_aux_list'] = torch.tensor([])
+        else:
+            data_dict['image_aux_list'] = torch.tensor([])
+        
         data_dict['noise_level'] = torch.stack(data_dict['noise_level']) if 'noise_level' in data_dict and data_dict['noise_level'] else torch.tensor([])
         return data_dict
 
