@@ -906,6 +906,60 @@ def preprocess(
 
     return dict(input_ids=input_ids, labels=targets)
 
+class ImageProcessor:
+    def __init__(self, block_size: int = 16):
+        self.block_size = block_size  # 设置图像要被分割成的块的数量
+
+    def add_noise_to_images(self, image: Image.Image, noise_levels: List[float]) -> List[tuple[Image.Image, float]]:
+        noisy_images = []
+        for noise_level in noise_levels:
+            # 随机选择模糊半径，范围与噪声水平相关
+            radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
+            # 应用高斯模糊
+            blurred_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
+            # 混合原始图像和模糊图像，传递噪声水平以调整使用原图块的概率
+            mixed_image = self.mixup_images(image, blurred_image, noise_level)
+            noisy_images.append(mixed_image)
+        return noisy_images
+
+    def mixup_images(self, original: Image.Image, blurred: Image.Image, noise_level: float) -> List[tuple[Image.Image, float]]:
+        # 获取图片的宽度和高度
+        width, height = original.size
+        block_width, block_height = width // self.block_size, height // self.block_size
+        
+        # 创建新图片，以模糊图片为背景
+        mixed_image = blurred.copy()
+        
+        # 计算使用原图块的概率，随噪声水平减少
+        use_original_probability = 1-noise_level / 100  # 保持至少10%概率使用原图
+        
+        for i in range(self.block_size):
+            for j in range(self.block_size):
+                if random.random() < use_original_probability:  # 根据噪声水平调整的概率决定是否使用原图的块
+                    # 获取当前块的坐标
+                    x1, y1 = i * block_width, j * block_height
+                    x2, y2 = x1 + block_width, y1 + block_height
+                    # 确保不超出图片范围
+                    x2 = min(x2, width)
+                    y2 = min(y2, height)
+                    # 从原图中获取块
+                    block = original.crop((x1, y1, x2, y2))
+                    # 将块粘贴到混合图像上
+                    mixed_image.paste(block, (x1, y1))
+                    
+        return mixed_image
+
+import json
+import os
+from torch.utils.data import Dataset
+from PIL import Image, ImageFilter
+import torch
+import copy
+import numpy as np
+import random
+from typing import Dict, List, Union
+from torch import nn, LongTensor
+import torch
 
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
@@ -919,7 +973,7 @@ class LazySupervisedDataset(Dataset):
         self.data_path = data_path
         self.data_args = data_args
         self.length = self._get_length()
-
+        self.noise_levels=[0,30,50]
     def _get_length(self):
         """Calculates the number of samples in the .jsonl file."""
         with open(self.data_path, 'r') as file:
@@ -963,77 +1017,123 @@ class LazySupervisedDataset(Dataset):
     def _has_image(self, sample: dict) -> bool:
         return "image" in sample and not str(sample['image']) in ['', 'None', 'none', 'nan']
 
-    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        #sources = self.list_data_dict[i]
+    def add_noise_to_images(self, image: Image.Image, noise_levels: List[float]) -> List[tuple[Image.Image, float]]:
+        # 创建ImageProcessor实例
+        block_size = int(16)
+        processor = ImageProcessor(block_size)
 
-        with open(self.data_path, 'r') as file:
-            for idx, line in enumerate(file):
-                if idx == i:
-                    sources = json.loads(line.strip())
-                    break
-        dat = sources
-        if isinstance(i, int):
-            sources = [sources]
-        assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
-        has_image = self._has_image(dat)
-        if has_image:
-            image_file = dat['image']
-            image_folder = self.data_args.image_folder
-            processor_aux_list = self.data_args.image_processor_aux_list
-            try:
-                image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
-            except:
-                return self.__getitem__(0)
-            image_size = image.size
-            def expand2square(pil_img, background_color):
-                width, height = pil_img.size
-                if width == height:
-                    return pil_img
-                elif width > height:
-                    result = Image.new(pil_img.mode, (width, width), background_color)
-                    result.paste(pil_img, (0, (width - height) // 2))
-                    # result.paste(pil_img, (0, 0))
-                    return result
-                else:
-                    result = Image.new(pil_img.mode, (height, height), background_color)
-                    result.paste(pil_img, ((height - width) // 2, 0))
-                    # result.paste(pil_img, (0, 0))
-                    return result
-            if self.data_args.image_aspect_ratio != 'pad':
-                raise NotImplementedError("Only pad is supported for now.")
-            
-            image_aux_list = []
-            for processor_aux in processor_aux_list:
-                image_aux = image
-                target_resolution = processor_aux.crop_size['height']
-                image_aux =  expand2square(image_aux, tuple(int(x*255) for x in processor_aux.image_mean)).resize((target_resolution, target_resolution))
-                image_aux = processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0]
-                image_aux_list.append(image_aux)
+        # 添加噪声并获取处理后的图像列表
+        noisy_images = processor.add_noise_to_images(image, noise_levels)
 
-            sources = preprocess_multimodal(
-                copy.deepcopy([e["conversations"] for e in sources]),
-                self.data_args)
+        return noisy_images
+
+    def preprocess_and_pad_image(self, pil_img, processor, background_color=(255, 255, 255)):
+        if self.data_args.image_aspect_ratio == 'pad':
+            width, height = pil_img.size
+            if width != height:
+                max_side = max(width, height)
+                result = Image.new(pil_img.mode, (max_side, max_side), background_color)
+                result.paste(pil_img, ((max_side - width) // 2, (max_side - height) // 2))
+                pil_img = result
+        return processor.preprocess(pil_img, return_tensors='pt')['pixel_values'][0]
+
+    def adjust_tensor_shapes(self, tensor_list):
+        """
+        
+        参数:
+            tensor_list (list of torch.Tensor): 形状为[4, 1, N]的张量列表。
+        
+        返回:
+            torch.Tensor: 调整后形状为[4*N]的张量列表。
+        """
+        adjusted_tensors = []
+        for tensor in tensor_list:
+            # 移除中间的大小为1的维度，得到形状[4, N]的张量
+            squeezed_tensor = tensor.squeeze(1)
+            # 遍历并分割张量
+            for i in range(squeezed_tensor.size(0)):  # 遍历4的维度
+                adjusted_tensors.append(squeezed_tensor[i])  # 添加到列表中
+
+        # 将调整后的张量列表堆叠成一个新的张量
+        return torch.stack(adjusted_tensors)
+
+    def __getitem__(self, i) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
+        sources = self.list_data_dict[i]
+        data_dict = {'input_ids': [], 'labels': [], 'image': [], 'noise_level': []}
+
+        # 假设preprocess函数处理文本并返回Tensor
+        processed_text = preprocess([e["conversations"] for e in [sources]],
+                                    self.tokenizer,
+                                    has_image='image' in sources)
+
+        if not isinstance(processed_text["input_ids"], torch.Tensor):
+            input_ids_tensor = torch.tensor(processed_text["input_ids"], dtype=torch.long).clone().detach()
         else:
-            sources = copy.deepcopy([e["conversations"] for e in sources])
-        data_dict = preprocess(
-            sources,
-            self.tokenizer,
-            has_image=has_image)
-        if isinstance(i, int):
-            data_dict = dict(input_ids=data_dict["input_ids"][0],
-                             labels=data_dict["labels"][0])
-        if (data_dict['labels']!=IGNORE_INDEX).sum()==0:
-            return self.__getitem__(0)
-        # image exist in the data
-        if has_image:
-            data_dict['image_aux_list'] = image_aux_list
-        elif self.data_args.is_multimodal:
-            # image does not exist in the data, but the model is multimodal
-            crop_size = 336
-            processor_aux_list = self.data_args.image_processor_aux_list
-            data_dict['image_aux_list'] = [torch.zeros(3, processor_aux.crop_size['height'], processor_aux.crop_size['width']) for processor_aux in processor_aux_list]
-            image_size = (crop_size, crop_size)
-        data_dict['image_size'] = image_size
+            input_ids_tensor = processed_text["input_ids"].clone().detach().long()
+
+        if not isinstance(processed_text["labels"], torch.Tensor):
+            labels_tensor = torch.tensor(processed_text["labels"], dtype=torch.long).clone().detach()
+        else:
+            labels_tensor = processed_text["labels"].clone().detach().long()
+
+
+        if 'image' not in sources:
+            # 对于没有图像的样本，直接添加处理后的文本数据
+            processor = self.data_args.image_processor
+            if self.previous_image is not None and self.previous_image != 0:
+                image = self.previous_image
+            else:
+                # Construct a blank image sample (e.g., a white image)
+                blank_image = Image.new("RGB", (224, 224), color=(255, 255, 255))
+                image = blank_image.convert("RGB")
+            noise_levels = [0,30,50]
+            noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
+            for idx, img in enumerate(noisy_images_with_levels):
+                noisy_image_tensor = self.preprocess_and_pad_image(img, processor)
+                # data_dict['image'].append(pure_image_tensor)
+
+                data_dict['image'].append(noisy_image_tensor)
+                # data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+                
+                # # # 为每个噪声图像添加相同的文本数据
+                data_dict['input_ids'].append(input_ids_tensor)
+                data_dict['labels'].append(labels_tensor)
+            data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+        else:
+            # 加载并处理图像
+            image_file = sources['image']
+            image_folder = self.data_args.image_folder
+            processor = self.data_args.image_processor
+            image_path = os.path.join(image_folder, image_file)
+            image = Image.open(image_path).convert('RGB')
+            self.previous_image = image
+            noise_levels = self.noise_levels
+            noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
+            for idx, img in enumerate(noisy_images_with_levels):
+                noisy_image_tensor = self.preprocess_and_pad_image(img, processor)
+                # data_dict['image'].append(pure_image_tensor)
+
+                data_dict['image'].append(noisy_image_tensor)
+                # data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+                
+                # # # 为每个噪声图像添加相同的文本数据
+                data_dict['input_ids'].append(input_ids_tensor)
+                data_dict['labels'].append(labels_tensor)
+            data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
+            
+        data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
+        data_dict['labels'] = self.adjust_tensor_shapes(data_dict['labels'])
+        if 'image' in data_dict:
+            if isinstance(data_dict['image'], list) and data_dict['image']:
+                data_dict['image'] = torch.stack(data_dict['image'])
+            elif isinstance(data_dict['image'], torch.Tensor) and data_dict['image'].nelement() > 0:
+                # If it's already a tensor with elements, use it as it is
+                data_dict['image'] = data_dict['image']
+            else:
+                data_dict['image'] = torch.tensor([])
+        else:
+            data_dict['image'] = torch.tensor([])
+        data_dict['noise_level'] = torch.stack(data_dict['noise_level']) if 'noise_level' in data_dict and data_dict['noise_level'] else torch.tensor([])
         return data_dict
 
 def get_padding_offset(cur_size, original_size):
@@ -1165,6 +1265,14 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, imag
     return new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list
 
 
+from dataclasses import dataclass
+from typing import Sequence, Dict
+import torch
+import transformers
+
+IGNORE_INDEX = -100
+IMAGE_TOKEN_INDEX = -200  # Placeholder, replace with actual image token index
+
 @dataclass
 class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
@@ -1186,8 +1294,6 @@ class DataCollatorForSupervisedDataset(object):
 
         padding_side = self.tokenizer.padding_side 
 
-        # print_rank0("Pad token id is", self.tokenizer.pad_token_id)
-
         if padding_side == "left":
             input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (max_length - t.shape[0], 0), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
             labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, ( max_length - t.shape[0], 0), 'constant', IGNORE_INDEX) for t in labels]
@@ -1198,7 +1304,7 @@ class DataCollatorForSupervisedDataset(object):
         input_ids = torch.stack(input_ids)
         labels = torch.stack(labels)
         attention_mask = input_ids.ne(self.tokenizer.pad_token_id)
-        # insert dummy image
+
         for i in range(len(input_ids)):
             if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
                 cur_input_ids_tmp = input_ids[i].clone()
@@ -1215,8 +1321,10 @@ class DataCollatorForSupervisedDataset(object):
                 cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
                 cur_attention_mask_tmp[image_position] = False
                 attention_mask[i] = cur_attention_mask_tmp
+
         image_sizes = [instance['image_size'] for instance in instances]
         new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list = prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len, image_aux_token_len_list, max_length)
+
         batch = dict(
             input_ids=new_input_ids,
             labels=new_labels,
@@ -1232,6 +1340,10 @@ class DataCollatorForSupervisedDataset(object):
                 batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
             else:
                 batch['images'] = image_aux_list
+
+        if 'noise_level' in instances[0]:
+            noise_levels = [instance['noise_level'] for instance in instances]
+            batch['noise_levels'] = torch.stack(noise_levels).view(-1, 1)
 
         return batch
 
@@ -1724,8 +1836,9 @@ def train(INDEX, attn_implementation=None):
                         module = module.to(torch.bfloat16)
 
     log_rank0("Configuring data module...")
+    noise_level=[0,30,50]
     data_module = make_supervised_data_module(tokenizer=tokenizer,
-                                              data_args=data_args)
+                                              data_args=data_args,noise_level=noise_level)
 
     
 
