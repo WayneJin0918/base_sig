@@ -1151,7 +1151,7 @@ class LazySupervisedDataset(Dataset):
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
         
         if 'image_aux_list' in data_dict:
-            if isinstance(data_dict['image_aux_list'], list) and data_dict['image']:
+            if isinstance(data_dict['image_aux_list'], list) and data_dict['image_aux_list']:
                 data_dict['image_aux_list'] = torch.stack(data_dict['image_aux_list'])
             elif isinstance(data_dict['image_aux_list'], torch.Tensor) and data_dict['image_aux_list'].nelement() > 0:
                 # If it's already a tensor with elements, use it as it is
