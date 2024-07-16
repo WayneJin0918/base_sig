@@ -1035,6 +1035,8 @@ class LazySupervisedDataset(Dataset):
                 result = Image.new(pil_img.mode, (max_side, max_side), background_color)
                 result.paste(pil_img, ((max_side - width) // 2, (max_side - height) // 2))
                 pil_img = result
+        target_resolution = processor.crop_size['height']
+        pil_img = pil_img.resize((target_resolution, target_resolution))
         return processor.preprocess(pil_img, return_tensors='pt')['pixel_values'][0]
 
     def adjust_tensor_shapes(self, tensor_list):
@@ -1098,13 +1100,10 @@ class LazySupervisedDataset(Dataset):
                 for idx, img in enumerate(noisy_images_with_levels):
                     # Process each noisy image with the current processor_aux
                     target_resolution = processor_aux.crop_size['height']
-                    img = expand2square(img, tuple(int(x*255) for x in processor_aux.image_mean)).resize((target_resolution, target_resolution))
-                    image_aux = processor_aux.preprocess(img, return_tensors='pt')['pixel_values'][0]
-                    
-                    image_aux_list.append(image_aux)
+                    noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)
                     
                     # Add processed image to data_dict
-                    data_dict['image'].append(image_aux)
+                    data_dict['image'].append(noisy_image_tensor)
                     data_dict['input_ids'].append(input_ids_tensor)
                     data_dict['labels'].append(labels_tensor)
                 
@@ -1125,8 +1124,7 @@ class LazySupervisedDataset(Dataset):
                 for idx, img in enumerate(noisy_images_with_levels):
                     # Process each noisy image with the current processor_aux
                     target_resolution = processor_aux.crop_size['height']
-                    img = expand2square(img, tuple(int(x*255) for x in processor_aux.image_mean)).resize((target_resolution, target_resolution))
-                    noisy_image_tensor = processor_aux.preprocess(img, return_tensors='pt')['pixel_values'][0]
+                    noisy_image_tensor = self.preprocess_and_pad_image(img, processor_aux)
                     
                     data_dict['image'].append(noisy_image_tensor)
                     data_dict['input_ids'].append(input_ids_tensor)
@@ -1346,14 +1344,19 @@ class DataCollatorForSupervisedDataset(object):
             image_aux_attention_masks_list=im_aux_attention_masks_list
         )
 
-        if 'image_aux_list' in instances[0]:
-            image_aux_list = [instance['image_aux_list'] for instance in instances]
-            image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
-            if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
-                batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
+        # if 'image_aux_list' in instances[0]:
+        #     image_aux_list = [instance['image_aux_list'] for instance in instances]
+        #     image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
+        #     if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
+        #         batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
+        #     else:
+        #         batch['images'] = image_aux_list
+        if 'image' in instances[0]:
+            images = [instance['image'] for instance in instances]
+            if all(x is not None and x.shape == images[0].shape for x in images):
+                batch['images'] = torch.stack(images)
             else:
-                batch['images'] = image_aux_list
-
+                batch['images'] = images
         if 'noise_level' in instances[0]:
             noise_levels = [instance['noise_level'] for instance in instances]
             batch['noise_levels'] = torch.stack(noise_levels).view(-1, 1)
