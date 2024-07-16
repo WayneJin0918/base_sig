@@ -1327,7 +1327,7 @@ class DataCollatorForSupervisedDataset(object):
         input_ids = [item for sublist in input_ids for item in sublist]
         labels = [item for sublist in labels for item in sublist]
         noise_levels = [item for sublist in noise_levels for item in sublist]
-
+        print(input_ids,"id")
         input_ids = torch.nn.utils.rnn.pad_sequence(
             input_ids,
             batch_first=True,
