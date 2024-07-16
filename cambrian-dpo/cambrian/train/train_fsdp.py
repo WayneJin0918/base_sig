@@ -970,7 +970,7 @@ class LazySupervisedDataset(Dataset):
         super(LazySupervisedDataset, self).__init__()
 
         self.tokenizer = tokenizer
-        self.data_path = json.load(open(data_path, "r"))
+        self.data_path = data_path
         self.data_args = data_args
         self.length = self._get_length()
         self.noise_levels=[0,30,50]
@@ -1058,7 +1058,11 @@ class LazySupervisedDataset(Dataset):
         return torch.stack(adjusted_tensors)
 
     def __getitem__(self, i) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
-        sources = self.data_path[i]
+        with open(self.data_path, 'r') as file:
+            for idx, line in enumerate(file):
+                if idx == i:
+                    sources = json.loads(line.strip())
+                    break
         data_dict = {'input_ids': [], 'labels': [], 'image': [], 'noise_level': []}
 
         # 假设preprocess函数处理文本并返回Tensor
