@@ -69,6 +69,7 @@ class CambrianLlamaModel(CambrianMetaModel, LlamaModel):
         vision_tower_aux_attention_masks_list: Optional[List[torch.Tensor]] = None,
         final_vision_feature_size: Optional[List[tuple]] = None,
         global_context_feature: Optional[torch.Tensor] = None,
+        noise_levels: Optional[torch.FloatTensor] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
