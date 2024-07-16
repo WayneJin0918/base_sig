@@ -310,6 +310,7 @@ class CambrianLlamaForCausalLM(LlamaForCausalLM, CambrianMetaForCausalLM):
         image_aux_attention_masks_list: Optional[List[torch.Tensor]] = None,
         image_sizes: Optional[List[List[int]]] = None,
         return_dict: Optional[bool] = None,
+        noise_levels: Optional[torch.FloatTensor] = None,
         cache_position = None
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
@@ -487,6 +488,7 @@ class CambrianLlamaForCausalLM(LlamaForCausalLM, CambrianMetaForCausalLM):
                                       inputs_embeds=None, **kwargs):
         images = kwargs.pop("images", None)
         image_sizes = kwargs.pop("image_sizes", None)
+        noise_levels = kwargs.pop("noise_levels, None)
         inputs = super().prepare_inputs_for_generation(
             input_ids, past_key_values=past_key_values, inputs_embeds=inputs_embeds, **kwargs
         )
