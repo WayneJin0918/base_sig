@@ -1358,7 +1358,9 @@ class DataCollatorForSupervisedDataset(object):
                 attention_mask[i] = cur_attention_mask_tmp
 
         image_sizes = [instance['image_size'] for instance in instances]
+        print(image_sizes,"1")
         image_sizes = [item for sublist in image_sizes for item in sublist]
+        print(image_sizes,"2")
         new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list = prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len, image_aux_token_len_list, max_length)
 
         batch = dict(
