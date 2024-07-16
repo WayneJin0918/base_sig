@@ -1065,7 +1065,7 @@ class LazySupervisedDataset(Dataset):
                 if idx == i:
                     sources = json.loads(line.strip())
                     break
-        data_dict = {'input_ids': [], 'labels': [], 'image_aux_list': [], 'noise_level': [],'image_size'}
+        data_dict = {'input_ids': [], 'labels': [], 'image_aux_list': [], 'noise_level': [],'image_size': []}
 
         # 假设preprocess函数处理文本并返回Tensor
         processed_text = preprocess([e["conversations"] for e in [sources]],
