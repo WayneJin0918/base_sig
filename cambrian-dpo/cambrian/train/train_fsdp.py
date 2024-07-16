@@ -1392,12 +1392,11 @@ class DataCollatorForSupervisedDataset(object):
         #         batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
         #     else:
         #         batch['images'] = image_aux_list
-        if 'image_aux_list' in instances[0]:
-            images = [instance['image_aux_list'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
-                batch['images'] = image_aux_list
+        images = [instance['image_aux_list'] for instance in instances]
+        images = [item for sublist in images for item in sublist]
+        if images:
+            batch['images'] = torch.stack(images)
+            
         if 'noise_level' in instances[0]:
             noise_levels = [instance['noise_level'] for instance in instances]
             batch['noise_levels'] = torch.stack(noise_levels).view(-1, 1)
