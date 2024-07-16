@@ -1083,7 +1083,7 @@ class LazySupervisedDataset(Dataset):
 
         if 'image' not in sources:
             # 对于没有图像的样本，直接添加处理后的文本数据
-            processor = self.data_args.image_processor
+            processor = self.data_args.image_processor_aux_list
             if self.previous_image is not None and self.previous_image != 0:
                 image = self.previous_image
             else:
@@ -1107,7 +1107,7 @@ class LazySupervisedDataset(Dataset):
             # 加载并处理图像
             image_file = sources['image']
             image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor
+            processor = self.data_args.image_processor_aux_list
             image_path = os.path.join(image_folder, image_file)
             image = Image.open(image_path).convert('RGB')
             self.previous_image = image
