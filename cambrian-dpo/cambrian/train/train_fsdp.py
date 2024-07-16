@@ -1320,13 +1320,11 @@ class DataCollatorForSupervisedDataset(object):
 
         input_ids = [instance['input_ids'] for instance in instances]
         labels = [instance['labels'] for instance in instances]
-        images = [instance['image'] for instance in instances]
         noise_levels = [instance['noise_level'] for instance in instances]
 
         # Flatten lists of tensors
         input_ids = [item for sublist in input_ids for item in sublist]
         labels = [item for sublist in labels for item in sublist]
-        images = [item for sublist in images for item in sublist]
         noise_levels = [item for sublist in noise_levels for item in sublist]
 
         input_ids = torch.nn.utils.rnn.pad_sequence(
@@ -1371,19 +1369,19 @@ class DataCollatorForSupervisedDataset(object):
             image_aux_attention_masks_list=im_aux_attention_masks_list
         )
 
-        # if 'image_aux_list' in instances[0]:
-        #     image_aux_list = [instance['image_aux_list'] for instance in instances]
-        #     image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
-        #     if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
-        #         batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
-        #     else:
-        #         batch['images'] = image_aux_list
-        if 'image' in instances[0]:
-            images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
+        if 'image_aux_list' in instances[0]:
+            image_aux_list = [instance['image_aux_list'] for instance in instances]
+            image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
+            if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
+                batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
             else:
-                batch['images'] = images
+                batch['images'] = image_aux_list
+        # if 'image' in instances[0]:
+        #     images = [instance['image'] for instance in instances]
+        #     if all(x is not None and x.shape == images[0].shape for x in images):
+        #         batch['images'] = torch.stack(images)
+        #     else:
+        #         batch['images'] = images
         if 'noise_level' in instances[0]:
             noise_levels = [instance['noise_level'] for instance in instances]
             batch['noise_levels'] = torch.stack(noise_levels).view(-1, 1)
