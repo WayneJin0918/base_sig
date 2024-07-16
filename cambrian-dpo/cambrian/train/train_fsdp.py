@@ -1429,7 +1429,7 @@ class DataCollatorForSupervisedDataset(object):
                 transposed_aux_lists = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_lists)]
                 stacked_aux_lists = [torch.stack(image_aux) for image_aux in transposed_aux_lists]
                 batch_images.append(stacked_aux_lists)
-            batch_images = [torch.stack([batch_images[j][i] for j in range(3)], dim=1) for i in range(4)]
+            batch_images = [torch.cat([batch_images[j][i] for j in range(3)], dim=0) for i in range(4)]
             batch['images'] = batch_images
             
         if 'noise_level' in instances[0]:
