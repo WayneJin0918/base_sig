@@ -1132,7 +1132,7 @@ class LazySupervisedDataset(Dataset):
                 data_dict['image_aux_list'].append(image_aux_list)
                 data_dict['input_ids'].append(input_ids_tensor)
                 data_dict['labels'].append(labels_tensor)
-                data_dict['image_size'] = data_dict['image_size'].append(image_size)
+                ata_dict['image_size'].append(image_size)
                 data_dict['noise_level'].append(torch.tensor(noise_levels, dtype=torch.float))
             
         data_dict['input_ids'] = self.adjust_tensor_shapes(data_dict['input_ids'])
