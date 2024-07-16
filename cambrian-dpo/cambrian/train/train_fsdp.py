@@ -1931,7 +1931,7 @@ def train(INDEX, attn_implementation=None):
     log_rank0("Configuring data module...")
     noise_level=[0,30,50]
     data_module = make_supervised_data_module(tokenizer=tokenizer,
-                                              data_args=data_args, noise_level)
+                                              data_args=data_args, noise_level=noise_level)
 
     
 
