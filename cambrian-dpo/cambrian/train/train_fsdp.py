@@ -966,7 +966,7 @@ class LazySupervisedDataset(Dataset):
 
     def __init__(self, data_path: str,
                  tokenizer: transformers.PreTrainedTokenizer,
-                 data_args: DataArguments):
+                 data_args: DataArguments, noise_level):
         super(LazySupervisedDataset, self).__init__()
 
         self.tokenizer = tokenizer
@@ -1441,11 +1441,12 @@ class DataCollatorForSupervisedDataset(object):
 
 
 def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
-                                data_args) -> Dict:
+                                data_args, noise_level) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
     train_dataset = LazySupervisedDataset(tokenizer=tokenizer,
                                 data_path=data_args.data_path,
-                                data_args=data_args)
+                                data_args=data_args,
+                                noise_level=noise_level)
     data_collator_kwargs = {
             'tokenizer': tokenizer,
         }
