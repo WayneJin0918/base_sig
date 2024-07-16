@@ -970,7 +970,7 @@ class LazySupervisedDataset(Dataset):
         super(LazySupervisedDataset, self).__init__()
 
         self.tokenizer = tokenizer
-        self.data_path = data_path
+        self.data_path = json.load(open(data_path, "r"))
         self.data_args = data_args
         self.length = self._get_length()
         self.noise_levels=[0,30,50]
