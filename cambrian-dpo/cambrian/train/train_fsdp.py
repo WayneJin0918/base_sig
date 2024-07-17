@@ -973,7 +973,8 @@ class LazySupervisedDataset(Dataset):
         self.data_path = data_path
         self.data_args = data_args
         self.length = self._get_length()
-        self.noise_levels=[0,30,50]
+        # self.noise_levels=[0,30,50]
+        self.noise_levels=[0,50]
         self.previous_image = None
     def _get_length(self):
         """Calculates the number of samples in the .jsonl file."""
@@ -1113,7 +1114,7 @@ class LazySupervisedDataset(Dataset):
                 image = blank_image.convert("RGB")
                 image_size = image.size
                 
-            noise_levels = [0, 30, 50]
+            noise_levels = self.noise_levels
             noisy_images_with_levels = self.add_noise_to_images(image, noise_levels)
             
             for idx, img in enumerate(noisy_images_with_levels):
@@ -1429,7 +1430,7 @@ class DataCollatorForSupervisedDataset(object):
                 transposed_aux_lists = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_lists)]
                 stacked_aux_lists = [torch.stack(image_aux) for image_aux in transposed_aux_lists]
                 batch_images.append(stacked_aux_lists)
-            batch_images = [torch.cat([batch_images[j][i] for j in range(3)], dim=0) for i in range(4)]
+            batch_images = [torch.cat([batch_images[j][i] for j in range(len(list(transposed_image_aux_lists)))], dim=0) for i in range(len(list(stacked_aux_lists)))]
             batch['images'] = batch_images
             
         if 'noise_level' in instances[0]:
