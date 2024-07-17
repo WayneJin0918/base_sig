@@ -973,8 +973,8 @@ class LazySupervisedDataset(Dataset):
         self.data_path = data_path
         self.data_args = data_args
         self.length = self._get_length()
-        # self.noise_levels=[0,30,50]
-        self.noise_levels=[0,50]
+        self.noise_levels=[0,30,50]
+        # self.noise_levels=[0,50]
         self.previous_image = None
     def _get_length(self):
         """Calculates the number of samples in the .jsonl file."""
