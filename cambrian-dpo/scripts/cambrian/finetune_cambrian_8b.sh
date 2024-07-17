@@ -3,6 +3,7 @@ export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-finetune" &&
+export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
 
 export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
 
@@ -50,7 +51,7 @@ python cambrian/train/train_tpu.py \
     --tf32 False \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 8 \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
