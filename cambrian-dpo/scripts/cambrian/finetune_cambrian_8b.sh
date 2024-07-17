@@ -1,7 +1,7 @@
 
 export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
-# export WANDB_RESUME="allow" &&
+export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-finetune" &&
 
 export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
