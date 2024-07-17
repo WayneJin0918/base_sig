@@ -201,128 +201,126 @@ import torch
 import torch.nn.functional as F
 
 class CambrianTrainer(Trainer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-    # def get_batch_logps(self, logits: torch.FloatTensor, labels: torch.LongTensor, return_per_token_logp=False, return_all=False) -> torch.FloatTensor:
-    #     """Compute the log probabilities of the given labels under the given logits.
+    def get_batch_logps(self, logits: torch.FloatTensor, labels: torch.LongTensor, return_per_token_logp=False, return_all=False) -> torch.FloatTensor:
+        """Compute the log probabilities of the given labels under the given logits.
 
-    #     Args:
-    #         logits: Logits of the model (unnormalized). Shape: (batch_size, sequence_length, vocab_size)
-    #         labels: Labels for which to compute the log probabilities. Label tokens with a value of -100 are ignored. Shape: (batch_size, sequence_length)
-    #     Returns:
-    #         A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
-    #     """
-    #     assert logits.shape[:-1] == labels.shape
+        Args:
+            logits: Logits of the model (unnormalized). Shape: (batch_size, sequence_length, vocab_size)
+            labels: Labels for which to compute the log probabilities. Label tokens with a value of -100 are ignored. Shape: (batch_size, sequence_length)
+        Returns:
+            A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
+        """
+        assert logits.shape[:-1] == labels.shape
 
-    #     labels = labels[:, 1:].clone()
-    #     logits = logits[:, :-1, :]
-    #     loss_mask = (labels != -100)
+        labels = labels[:, 1:].clone()
+        logits = logits[:, :-1, :]
+        loss_mask = (labels != -100)
 
-    #     # dummy token; we'll ignore the losses on these tokens later
-    #     labels[labels == -100] = 0
+        # dummy token; we'll ignore the losses on these tokens later
+        labels[labels == -100] = 0
 
-    #     # Adding a small constant to logits for numerical stability
-    #     logits = logits + 1e-9
+        # Adding a small constant to logits for numerical stability
+        logits = logits + 1e-9
 
-    #     per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
+        per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
 
-    #     log_prob = (per_token_logps * loss_mask).sum(-1)
-    #     loss_mask_sum = loss_mask.sum(-1)
+        log_prob = (per_token_logps * loss_mask).sum(-1)
+        loss_mask_sum = loss_mask.sum(-1)
         
-    #     # To avoid division by zero, we use torch.where to conditionally divide
-    #     average_log_prob = log_prob / loss_mask_sum
+        # To avoid division by zero, we use torch.where to conditionally divide
+        average_log_prob = log_prob / loss_mask_sum
 
-    #     if return_per_token_logp:
-    #         return per_token_logps
+        if return_per_token_logp:
+            return per_token_logps
 
-    #     if return_all:
-    #         return per_token_logps, log_prob, average_log_prob
+        if return_all:
+            return per_token_logps, log_prob, average_log_prob
 
-    #     return log_prob, average_log_prob
+        return log_prob, average_log_prob
 
-    # def simpo_loss(self, policy_chosen_logps: torch.FloatTensor,
-    #                policy_rejected_logps: torch.FloatTensor,
-    #                lengths_chosen: torch.FloatTensor,
-    #                lengths_rejected: torch.FloatTensor,
-    #                beta: float,
-    #                gamma: float) -> torch.FloatTensor:
-    #     """Compute the SimPO loss for a batch of policy log probabilities and sequence lengths.
+    def simpo_loss(self, policy_chosen_logps: torch.FloatTensor,
+                   policy_rejected_logps: torch.FloatTensor,
+                   lengths_chosen: torch.FloatTensor,
+                   lengths_rejected: torch.FloatTensor,
+                   beta: float,
+                   gamma: float) -> torch.FloatTensor:
+        """Compute the SimPO loss for a batch of policy log probabilities and sequence lengths.
 
-    #     Args:
-    #         policy_chosen_logps: Log probabilities of the policy model for the chosen responses. Shape: (batch_size,)
-    #         policy_rejected_logps: Log probabilities of the policy model for the rejected responses. Shape: (batch_size,)
-    #         lengths_chosen: Lengths of the chosen responses. Shape: (batch_size,)
-    #         lengths_rejected: Lengths of the rejected responses. Shape: (batch_size,)
-    #         beta: Scaling parameter for the SimPO loss.
-    #         gamma: Margin parameter for the SimPO loss.
+        Args:
+            policy_chosen_logps: Log probabilities of the policy model for the chosen responses. Shape: (batch_size,)
+            policy_rejected_logps: Log probabilities of the policy model for the rejected responses. Shape: (batch_size,)
+            lengths_chosen: Lengths of the chosen responses. Shape: (batch_size,)
+            lengths_rejected: Lengths of the rejected responses. Shape: (batch_size,)
+            beta: Scaling parameter for the SimPO loss.
+            gamma: Margin parameter for the SimPO loss.
 
-    #     Returns:
-    #         A tensor containing the SimPO loss for each example in the batch.
-    #     """
-    #     normalized_chosen_logps = policy_chosen_logps / lengths_chosen
-    #     normalized_rejected_logps = policy_rejected_logps / lengths_rejected
-    #     if torch.isnan(normalized_chosen_logps).any():
-    #         print(policy_chosen_logps)
-    #     if torch.isnan(normalized_rejected_logps).any():
-    #         print(policy_rejected_logps)
-    #     logits = beta * (normalized_chosen_logps - normalized_rejected_logps) - gamma
-    #     losses = -F.logsigmoid(logits)
+        Returns:
+            A tensor containing the SimPO loss for each example in the batch.
+        """
+        normalized_chosen_logps = policy_chosen_logps / lengths_chosen
+        normalized_rejected_logps = policy_rejected_logps / lengths_rejected
+        if torch.isnan(normalized_chosen_logps).any():
+            print(policy_chosen_logps)
+        if torch.isnan(normalized_rejected_logps).any():
+            print(policy_rejected_logps)
+        logits = beta * (normalized_chosen_logps - normalized_rejected_logps) - gamma
+        losses = -F.logsigmoid(logits)
         
-    #     return losses
+        return losses
 
 
-    # def compute_loss(self, model, inputs, return_outputs=False):
-    #     outputs = model(**inputs)
-    #     noise_levels = inputs['noise_levels']
-    #     logits = outputs.logits
-    #     logits = logits[:, 575:, :] # Come from
-    #     labels = inputs['labels']
-    #     if logits.shape[:-1] == labels.shape:
-    #         # print(labels.size())
-    #         log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+    def compute_loss(self, model, inputs, return_outputs=False):
+        outputs = model(**inputs)
+        noise_levels = inputs['noise_levels']
+        logits = outputs.logits
+        logits = logits[:, 575:, :] # Come from
+        labels = inputs['labels']
+        if logits.shape[:-1] == labels.shape:
+            # print(labels.size())
+            log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
 
-    #         # Assuming noise levels are grouped into sets of 3 for each image in the batch
-    #         group_size = 2
-    #         num_groups = noise_levels.size(0) // group_size
+            # Assuming noise levels are grouped into sets of 3 for each image in the batch
+            group_size = 2
+            num_groups = noise_levels.size(0) // group_size
 
-    #         total_simpo_loss = outputs.loss
+            total_simpo_loss = outputs.loss
 
-    #         for i in range(num_groups):
-    #             group_log_prob = log_prob[i * group_size:(i + 1) * group_size]
-    #             group_average_log_prob = average_log_prob[i * group_size:(i + 1) * group_size]
-    #             group_lengths = (labels != -100).sum(dim=-1).float()[i * group_size:(i + 1) * group_size]
+            for i in range(num_groups):
+                group_log_prob = log_prob[i * group_size:(i + 1) * group_size]
+                group_average_log_prob = average_log_prob[i * group_size:(i + 1) * group_size]
+                group_lengths = (labels != -100).sum(dim=-1).float()[i * group_size:(i + 1) * group_size]
 
-    #             best_log_prob = group_log_prob[0]  # Assuming first is best based on noise level
-    #             worst_log_prob = group_log_prob[1]  # Assuming third is worst based on noise level
-    #             best_length = group_lengths[0]
-    #             worst_length = group_lengths[1]
+                best_log_prob = group_log_prob[0]  # Assuming first is best based on noise level
+                worst_log_prob = group_log_prob[1]  # Assuming third is worst based on noise level
+                best_length = group_lengths[0]
+                worst_length = group_lengths[1]
 
-    #             # Compute SimPO loss for this group
-    #             losses = self.simpo_loss(
-    #                 best_log_prob,
-    #                 worst_log_prob,
-    #                 best_length,
-    #                 worst_length,
-    #                 beta = 0.3,
-    #                 # beta = self.beta_update(self.state.global_step, self.state.max_steps),
-    #                 gamma = 0.05  # gamma value
-    #             )
+                # Compute SimPO loss for this group
+                losses = self.simpo_loss(
+                    best_log_prob,
+                    worst_log_prob,
+                    best_length,
+                    worst_length,
+                    beta = 0.3,
+                    # beta = self.beta_update(self.state.global_step, self.state.max_steps),
+                    gamma = 0.05  # gamma value
+                )
 
-    #             total_simpo_loss += losses.mean()
+                total_simpo_loss += losses.mean()
 
-    #         # Average the SimPO loss over all groups
-    #         total_simpo_loss /= num_groups
-    #         total_loss = total_simpo_loss
+            # Average the SimPO loss over all groups
+            total_simpo_loss /= num_groups
+            total_loss = total_simpo_loss
             
-    #     else:
-    #         total_loss = outputs.loss
-    #     if torch.isnan(total_loss): 
-    #         total_loss = outputs.loss
-    #         print(total_loss)
+        else:
+            total_loss = outputs.loss
+        if torch.isnan(total_loss): 
+            total_loss = outputs.loss
+            print(total_loss)
 
-    #     assert total_loss > 0
-    #     return (total_loss, outputs) if return_outputs else total_loss
+        assert total_loss > 0
+        return (total_loss, outputs) if return_outputs else total_loss
         
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
