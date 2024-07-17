@@ -279,50 +279,90 @@ class CambrianTrainer(Trainer):
         # print(noise_levels)
         print(logits.shape[:-1],"1")
         print(labels.shape,"2")
-        if logits.shape[:-1] == labels.shape:
-            # print(labels.size())
-            log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+        # if logits.shape[:-1] == labels.shape:
+        #     # print(labels.size())
+        #     log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
 
-            # Assuming noise levels are grouped into sets of 3 for each image in the batch
-            group_size = 3
-            num_groups = log_prob.size(0) // group_size
+        #     # Assuming noise levels are grouped into sets of 3 for each image in the batch
+        #     group_size = 3
+        #     num_groups = log_prob.size(0) // group_size
 
-            total_simpo_loss = outputs.loss
+        #     total_simpo_loss = outputs.loss
 
-            for i in range(num_groups):
-                group_log_prob = log_prob[i * group_size:(i + 1) * group_size]
-                print(group_log_prob.size(0),"i=",i)
-                group_average_log_prob = average_log_prob[i * group_size:(i + 1) * group_size]
-                group_lengths = (labels != -100).sum(dim=-1).float()[i * group_size:(i + 1) * group_size]
+        #     for i in range(num_groups):
+        #         group_log_prob = log_prob[i * group_size:(i + 1) * group_size]
+        #         print(group_log_prob.size(0),"i=",i)
+        #         group_average_log_prob = average_log_prob[i * group_size:(i + 1) * group_size]
+        #         group_lengths = (labels != -100).sum(dim=-1).float()[i * group_size:(i + 1) * group_size]
 
-                best_log_prob = group_log_prob[0]  # Assuming first is best based on noise level
-                worst_log_prob = group_log_prob[2]  # Assuming third is worst based on noise level
-                best_length = group_lengths[0]
-                worst_length = group_lengths[2]
+        #         best_log_prob = group_log_prob[0]  # Assuming first is best based on noise level
+        #         worst_log_prob = group_log_prob[2]  # Assuming third is worst based on noise level
+        #         best_length = group_lengths[0]
+        #         worst_length = group_lengths[2]
 
-                # Compute SimPO loss for this group
-                losses = self.simpo_loss(
-                    best_log_prob,
-                    worst_log_prob,
-                    best_length,
-                    worst_length,
-                    beta = 0.4,
-                    # beta = self.beta_update(self.state.global_step, self.state.max_steps),
-                    gamma = 0.05  # gamma value
-                )
+        #         # Compute SimPO loss for this group
+        #         losses = self.simpo_loss(
+        #             best_log_prob,
+        #             worst_log_prob,
+        #             best_length,
+        #             worst_length,
+        #             beta = 0.4,
+        #             # beta = self.beta_update(self.state.global_step, self.state.max_steps),
+        #             gamma = 0.05  # gamma value
+        #         )
             
-                total_simpo_loss += losses.mean()
+        #         total_simpo_loss += losses.mean()
 
-            # Average the SimPO loss over all groups
-            total_simpo_loss /= num_groups
+        #     # Average the SimPO loss over all groups
+        #     total_simpo_loss /= num_groups
+        #     total_loss = total_simpo_loss
+        #     print(total_loss)
+        # else:
+        #     total_loss = outputs.loss
+        # if torch.isnan(total_loss): 
+        #     total_loss = outputs.loss
+        #     print(total_loss)
+
+        # assert total_loss > 0
+        # return (total_loss, outputs) if return_outputs else total_loss
+        if logits.shape[:-1] == labels.shape:
+            log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+    
+            group_size = 3
+            batch_size = log_prob.size(0)
+            num_groups = batch_size // group_size
+    
+            if batch_size % group_size != 0:
+                raise ValueError("Batch size must be divisible by the group size")
+    
+            log_prob = log_prob.view(num_groups, group_size)
+            average_log_prob = average_log_prob.view(num_groups, group_size)
+            lengths = (labels != -100).sum(dim=-1).float().view(num_groups, group_size)
+    
+            best_log_prob = log_prob[:, 0]
+            worst_log_prob = log_prob[:, 2]
+            best_length = lengths[:, 0]
+            worst_length = lengths[:, 2]
+    
+            losses = self.simpo_loss(
+                best_log_prob,
+                worst_log_prob,
+                best_length,
+                worst_length,
+                beta=0.4,
+                gamma=0.05
+            )
+    
+            total_simpo_loss = losses.mean()
             total_loss = total_simpo_loss
             print(total_loss)
         else:
             total_loss = outputs.loss
-        if torch.isnan(total_loss): 
+        
+        if torch.isnan(total_loss):
             total_loss = outputs.loss
             print(total_loss)
-
+    
         assert total_loss > 0
         return (total_loss, outputs) if return_outputs else total_loss
         
