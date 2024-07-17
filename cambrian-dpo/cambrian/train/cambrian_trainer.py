@@ -312,7 +312,7 @@ class CambrianTrainer(Trainer):
             # Average the SimPO loss over all groups
             total_simpo_loss /= num_groups
             total_loss = total_simpo_loss
-        
+            print(total_loss)
         else:
             total_loss = outputs.loss
         if torch.isnan(total_loss): 
