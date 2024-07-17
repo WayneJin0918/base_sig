@@ -273,7 +273,7 @@ class CambrianTrainer(Trainer):
         outputs = model(**inputs)
         noise_levels = inputs['noise_levels']
         logits = outputs.logits
-        logits = logits[:, 575:, :] # Come from
+        # logits = logits[:, 575:, :] # Come from
         labels = inputs['labels']
         # print(noise_levels)
         print(logits.shape[:-1],"1")
