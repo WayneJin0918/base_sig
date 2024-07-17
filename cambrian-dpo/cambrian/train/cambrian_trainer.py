@@ -291,6 +291,7 @@ class CambrianTrainer(Trainer):
 
             for i in range(num_groups):
                 group_log_prob = log_prob[i * group_size:(i + 1) * group_size]
+                print(group_log_prob.size(0),"i=",i)
                 group_average_log_prob = average_log_prob[i * group_size:(i + 1) * group_size]
                 group_lengths = (labels != -100).sum(dim=-1).float()[i * group_size:(i + 1) * group_size]
 
