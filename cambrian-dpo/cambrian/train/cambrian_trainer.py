@@ -276,6 +276,8 @@ class CambrianTrainer(Trainer):
         logits = logits[:, 575:, :] # Come from
         labels = inputs['labels']
         # print(noise_levels)
+        print(logits.shape[:-1],"1")
+        print(labels.shape,"2")
         if logits.shape[:-1] == labels.shape:
             # print(labels.size())
             log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
