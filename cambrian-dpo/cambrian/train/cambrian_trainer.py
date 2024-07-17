@@ -285,7 +285,7 @@ class CambrianTrainer(Trainer):
 
             # Assuming noise levels are grouped into sets of 3 for each image in the batch
             group_size = 3
-            num_groups = noise_levels.size(0) // group_size
+            num_groups = log_prob.size(0) // group_size
 
             total_simpo_loss = outputs.loss
 
