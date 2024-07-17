@@ -283,7 +283,7 @@ class CambrianTrainer(Trainer):
             log_prob, average_log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
 
             # Assuming noise levels are grouped into sets of 3 for each image in the batch
-            group_size = 3
+            group_size = 2
             num_groups = noise_levels.size(0) // group_size
 
             total_simpo_loss = outputs.loss
@@ -294,9 +294,9 @@ class CambrianTrainer(Trainer):
                 group_lengths = (labels != -100).sum(dim=-1).float()[i * group_size:(i + 1) * group_size]
 
                 best_log_prob = group_log_prob[0]  # Assuming first is best based on noise level
-                worst_log_prob = group_log_prob[2]  # Assuming third is worst based on noise level
+                worst_log_prob = group_log_prob[1]  # Assuming third is worst based on noise level
                 best_length = group_lengths[0]
-                worst_length = group_lengths[2]
+                worst_length = group_lengths[1]
 
                 # Compute SimPO loss for this group
                 losses = self.simpo_loss(
@@ -323,6 +323,7 @@ class CambrianTrainer(Trainer):
 
         assert total_loss > 0
         return (total_loss, outputs) if return_outputs else total_loss
+        
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
