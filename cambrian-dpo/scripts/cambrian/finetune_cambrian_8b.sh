@@ -26,7 +26,7 @@ python cambrian/train/train_tpu.py \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
-    --unfreeze_mm_vision_tower True \
+    --unfreeze_mm_vision_tower False \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
