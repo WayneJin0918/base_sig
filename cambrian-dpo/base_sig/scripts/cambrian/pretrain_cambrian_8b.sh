@@ -5,7 +5,7 @@ export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-pretrain-all" &&
 
-export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
+export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
 
 python cambrian/train/train_tpu.py \
     --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
