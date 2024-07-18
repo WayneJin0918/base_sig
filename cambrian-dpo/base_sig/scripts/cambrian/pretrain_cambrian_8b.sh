@@ -31,7 +31,7 @@ python cambrian/train/train_tpu.py \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
-    --bf16 False \
+    --bf16 True \
     --output_dir $CKPT_DIR \
     --num_train_epochs 1 \
     --per_device_train_batch_size 8 \
