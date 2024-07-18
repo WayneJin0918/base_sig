@@ -11,7 +11,7 @@ python cambrian/train/train_tpu.py \
     --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
     --data_path /home/wayneyjin/alignment_2.5m.jsonl \
-    --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
+    --image_folder /home/wayneyjin/pretrain_data \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
     --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
