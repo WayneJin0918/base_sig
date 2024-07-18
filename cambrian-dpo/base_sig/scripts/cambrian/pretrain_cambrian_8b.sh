@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export PJRT_DEVICE=TPU &&
-export XLA_USE_BF16=0 &&
+# export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-pretrain-all" &&
 
@@ -34,8 +34,8 @@ python cambrian/train/train_tpu.py \
     --bf16 True \
     --output_dir $CKPT_DIR \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
