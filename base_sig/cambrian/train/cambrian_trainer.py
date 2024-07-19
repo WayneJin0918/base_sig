@@ -237,30 +237,20 @@ def map_params_to_module_names(model_list):
 
 class CambrianTrainer(Trainer):
 
-    def get_train_dataloader(self) -> DataLoader:
+    def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
-            raise ValueError("Training dataset must be provided.")
+            return None
 
         if self.args.group_by_modality_length:
             lengths = self.train_dataset.modality_lengths
-            sampler = LengthGroupedSampler(
+            return LengthGroupedSampler(
                 self.args.train_batch_size,
                 world_size=self.args.world_size * self.args.gradient_accumulation_steps,
                 lengths=lengths,
                 group_by_modality=True,
             )
         else:
-            sampler = super()._get_train_sampler()
-
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.args.train_batch_size,
-            sampler=sampler,
-            collate_fn=self.data_collator,
-            drop_last=self.args.dataloader_drop_last,
-            num_workers=self.args.dataloader_num_workers,
-            pin_memory=self.args.dataloader_pin_memory,
-        )
+            return super()._get_train_sampler()
 
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
