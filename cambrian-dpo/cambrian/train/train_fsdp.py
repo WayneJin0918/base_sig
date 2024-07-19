@@ -1785,32 +1785,17 @@ def train(INDEX, attn_implementation=None):
         model.model.requires_grad_(False)
 
     log_rank0("Model loaded.")
-    noise_level=[0,30,50]
+    # 伪造一个示例输入
+    example_input_ids = torch.randint(0, tokenizer.vocab_size, (1, data_args.image_token_len)).to(torch.long)
+    example_attention_mask = torch.ones_like(example_input_ids)
 
-    vision_tower_aux_list = model.get_vision_tower_aux_list()
-        
-    if not training_args.unfreeze_mm_vision_tower:
-            # vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
-        if vision_tower_aux_list is not None:
-            for vision_tower_aux in vision_tower_aux_list:
-                vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
-    else:
-            # vision_tower.to(device=training_args.device)
-        if vision_tower_aux_list is not None:
-            for vision_tower_aux in vision_tower_aux_list:
-                vision_tower_aux.to(device=training_args.device)
-                # vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
-        # data_args.image_processor = vision_tower.image_processor
-    if vision_tower_aux_list is not None:
-            data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
+    example_input = {
+        'input_ids': example_input_ids,
+        'attention_mask': example_attention_mask
+    }
 
-    data_module = make_supervised_data_module(tokenizer=tokenizer,
-                                              data_args=data_args, noise_level=noise_level)
+    model = convert_model_to_torchscript(model, (example_input['input_ids'], example_input['attention_mask']))
 
-    train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
-    example_batch = next(iter(train_dataloader))
-    example_batch = example_batch['input_ids']
-    model = convert_model_to_torchscript(model, example_input)
     log_rank0("Model converted to TorchScript.")
 
     if training_args.bits in [4, 8]:
