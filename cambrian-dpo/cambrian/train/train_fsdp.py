@@ -1791,7 +1791,7 @@ def train(INDEX, attn_implementation=None):
 
 
 
-        vision_tower_aux_list = model.get_vision_tower_aux_list()
+    vision_tower_aux_list = model.get_vision_tower_aux_list()
         
     if not training_args.unfreeze_mm_vision_tower:
             # vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
