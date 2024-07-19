@@ -257,12 +257,12 @@ class CambrianTrainer(Trainer):
         model.train()
         inputs = self._prepare_inputs(inputs)
         import numpy as np
-
-        # 打印输入的形状
-        for k, v in inputs.items():
-            if isinstance(v, list):
-                v = np.array(v)  # 将 list 转换为 numpy 数组
-            print(f"{k} shape: {v.shape}")
+        print(inputs)
+        # # 打印输入的形状
+        # for k, v in inputs.items():
+        #     if isinstance(v, list):
+        #         v = np.array(v)  # 将 list 转换为 numpy 数组
+        #     print(f"{k} shape: {v.shape}")
 
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
