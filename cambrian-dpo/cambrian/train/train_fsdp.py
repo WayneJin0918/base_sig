@@ -1782,7 +1782,7 @@ def train(INDEX, attn_implementation=None):
         model.model.requires_grad_(False)
 
     log_rank0("Model loaded.")
-
+    noise_level=[0,30,50]
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args, noise_level=noise_level)
 
