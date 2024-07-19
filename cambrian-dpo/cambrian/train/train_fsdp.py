@@ -1602,398 +1602,13 @@ if IS_XLA_AVAILABLE:
     from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel
     XlaFullyShardedDataParallel._shard_parameters_ = _shard_parameters_
 
-# def train(INDEX, attn_implementation=None):
-
-#     global local_rank
-    
-#     log_rank0(f"Training on index {INDEX}. Local rank: {local_rank}")
-
-#     parser = transformers.HfArgumentParser(
-#         (ModelArguments, DataArguments, TrainingArguments))
-#     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-#     local_rank = training_args.local_rank
-#     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-
-#     # verify that the train_batch_size is set correctly
-#     if training_args.batch_size is not None:
-#         if IS_XLA_AVAILABLE:
-#             import torch_xla.core.xla_model as xm
-#             world_size = xm.xrt_world_size()
-
-#             if training_args.per_device_train_batch_size is None:
-#                 raise ValueError("If train_batch_size is set, per_device_train_batch_size must be set")
-
-#             if training_args.batch_size != training_args.per_device_train_batch_size * world_size:
-#                 raise ValueError(f"train_batch_size ({training_args.train_batch_size}) must equal per_device_train_batch_size ({training_args.per_device_train_batch_size}) * world_size ({world_size})")
-
-#             logger.warning(f"per_device_train_batch_size is correctly set to {training_args.per_device_train_batch_size} with world_size {world_size} to match train_batch_size {training_args.batch_size}")
-#             logger.warning(f"train_batch_size is {training_args.train_batch_size}")
-
-    
-#     # TPU Note, the original LLaMA RMSNorm implementation has a bug here, the dtype conversion is not correct. It is ok in GPU but kills TPU training.
-#     def forward(self, hidden_states):
-#         input_dtype = hidden_states.dtype
-#         hidden_states = hidden_states.to(torch.float32)
-#         variance = hidden_states.pow(2).mean(-1, keepdim=True)
-#         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-#         output = (self.weight * hidden_states).to(input_dtype)
-#         return output
-
-#     transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
-#     transformers.models.mistral.modeling_mistral.MistralRMSNorm.forward = forward
-
-#     def new_forward_conv(self, input):
-#         if self.bias is None:
-#             return self._conv_forward(input, self.weight, self.bias)
-#         return self._conv_forward(input, self.weight, self.bias.to(input.dtype))
-
-#     nn.Conv2d.forward = new_forward_conv
-
-#     def new_forward_linear(self, input):
-#         if self.bias is None:
-#             return F.linear(input, self.weight, self.bias)
-#         return F.linear(input, self.weight, self.bias.to(input.dtype)).to(input.dtype)
-
-#     nn.Linear.forward = new_forward_linear
-
-#     bnb_model_from_pretrained_args = {}
-#     if training_args.bits in [4, 8]:
-#         from transformers import BitsAndBytesConfig
-#         bnb_model_from_pretrained_args.update(dict(
-#             device_map={"": training_args.device},
-#             load_in_4bit=training_args.bits == 4,
-#             load_in_8bit=training_args.bits == 8,
-#             quantization_config=BitsAndBytesConfig(
-#                 load_in_4bit=training_args.bits == 4,
-#                 load_in_8bit=training_args.bits == 8,
-#                 llm_int8_skip_modules=["mm_projector"],
-#                 llm_int8_threshold=6.0,
-#                 llm_int8_has_fp16_weight=False,
-#                 bnb_4bit_compute_dtype=compute_dtype,
-#                 bnb_4bit_use_double_quant=training_args.double_quant,
-#                 bnb_4bit_quant_type=training_args.quant_type # {'fp4', 'nf4'}
-#             )
-#         ))
-#     else:
-#         log_rank0(f"Loading model in full precision")
-
-#     use_cohere = False
-#     data_args.image_token_len = model_args.image_token_len
-
-#     if model_args.vision_tower_aux_list is not None:
-#         # copy image_token_len and image_position to model_args
-#         # data_args.image_token_len = model_args.image_token_len
-#         model_args.image_position = data_args.image_position
-
-        
-#         # Assuming model_args.model_name_or_path is a string that includes the model size
-#         model_name = model_args.model_name_or_path
-
-#         # Regular expression to find the number of parameters in the model's name (assuming a convention like 'ModelName-30b')
-#         match = re.search(r'(\d+)b', model_name)
-#         num_parameters_billion = float(match.group(1)) if match else 0
-
-#         # Determine if bfloat16 should be used based on the model's size
-#         use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
-
-#         if "yi" in model_args.model_name_or_path.lower():
-#             use_bfloat16 = True
-
-#         elif "mistral" in model_name.lower():
-#             logger.warning(f"Vision tower, loading CambrianMistralForCausalLM: {model_args.model_name_or_path}")
-
-#             # replace training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer
-#             if (
-#                 hasattr(training_args, 'fsdp_config') and
-#                 'transformer_layer_cls_to_wrap' in training_args.fsdp_config.keys()
-#             ):
-#                 logger.warning(f"Replacing training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer. Previous value: {training_args.fsdp_config['transformer_layer_cls_to_wrap']}")
-#                 training_args.fsdp_config["transformer_layer_cls_to_wrap"] = ["MistralDecoderLayer"]
-
-#             model = CambrianMistralForCausalLM.from_pretrained(
-#                 model_name,
-#                 cache_dir=training_args.cache_dir,
-#                 do_sample=True,
-#                 torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-#                 **bnb_model_from_pretrained_args
-#             )
-#             transformers.models.mistral.modeling_mistral.MistralRMSNorm.forward = forward
-#         elif "phi-3" in model_name.lower():
-#             logger.warning(f"Vision tower, loading CambrianPhi3ForCausalLM: {model_args.model_name_or_path}")
-            
-#             # replace training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer
-#             if (
-#                 hasattr(training_args, 'fsdp_config') and
-#                 'transformer_layer_cls_to_wrap' in training_args.fsdp_config.keys()
-#             ):
-#                 logger.warning(f"Replacing training_args.fsdp_config.transformer_layer_cls_to_wrap with Phi3DecoderLayer. Previous value: {training_args.fsdp_config['transformer_layer_cls_to_wrap']}")
-#                 training_args.fsdp_config["transformer_layer_cls_to_wrap"] = ["Phi3DecoderLayer"]
-#             model = CambrianPhi3ForCausalLM.from_pretrained(
-#                     model_name,
-#                     cache_dir=training_args.cache_dir,
-#                     do_sample=True,
-#                     torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-#                     **bnb_model_from_pretrained_args
-#             )
-#             cambrian.model.language_model.phi3.modeling_phi3.Phi3RMSNorm.forward = forward
-#         else:
-#             logger.warning(f"Vision tower, loading CambrianLlamaForCausalLM: {model_args.model_name_or_path}")
-#             model = CambrianLlamaForCausalLM.from_pretrained(
-#                 model_args.model_name_or_path,
-#                 cache_dir=training_args.cache_dir,
-#                 do_sample=True,
-#                 torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
-#                 **bnb_model_from_pretrained_args
-#             )
-#     else:
-#         logger.warning(f"No vision tower, loading pure language model: {model_args.model_name_or_path}")
-#         model = transformers.LlamaForCausalLM.from_pretrained(
-#             model_args.model_name_or_path,
-#             cache_dir=training_args.cache_dir,
-#             attn_implementation=attn_implementation,
-#             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-#             **bnb_model_from_pretrained_args
-#         )
-#     model.config.use_cache = False
-#     model.generation_config.do_sample = True
-
-#     if model_args.freeze_backbone:
-#         model.model.requires_grad_(False)
-
-#     log_rank0("Model loaded.")
-
-#     if training_args.bits in [4, 8]:
-#         from peft import prepare_model_for_kbit_training
-#         model.config.torch_dtype = (
-#             torch.float32 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-#         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=training_args.gradient_checkpointing)
-
-#     if training_args.gradient_checkpointing:
-#         log_rank0("Using gradient checkpointing")
-#         if hasattr(model, "enable_input_require_grads"):
-#             model.enable_input_require_grads()
-#         else:
-#             def make_inputs_require_grad(module, input, output):
-#                 output.requires_grad_(True)
-
-#             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
-
-#     if training_args.lora_enable:
-#         log_rank0("Adding LoRA adapters...")
-#         from peft import LoraConfig, get_peft_model
-#         lora_config = LoraConfig(
-#             r=training_args.lora_r,
-#             lora_alpha=training_args.lora_alpha,
-#             target_modules=find_all_linear_names(model),
-#             lora_dropout=training_args.lora_dropout,
-#             bias=training_args.lora_bias,
-#             task_type="CAUSAL_LM",
-#         )
-#         if training_args.bits == 16:
-#             if training_args.bf16:
-#                 model.to(torch.bfloat16)
-#             if training_args.fp16:
-#                 model.to(torch.float16)
-#         print_rank0("Adding LoRA adapters...")
-#         model = get_peft_model(model, lora_config)
-
-#     log_rank0("Configuring tokenizer...")
-#     if 'mpt' in model_args.model_name_or_path:
-#         tokenizer = transformers.AutoTokenizer.from_pretrained(
-#             model_args.model_name_or_path,
-#             cache_dir=training_args.cache_dir,
-#             model_max_length=training_args.model_max_length,
-#             padding_side="right"
-#         )
-#     else:
-#         tokenizer = transformers.AutoTokenizer.from_pretrained(
-#             model_args.model_name_or_path,
-#             cache_dir=training_args.cache_dir,
-#             model_max_length=training_args.model_max_length,
-#             padding_side="right",
-#             use_fast=False,
-#         )
-
-#     if model_args.version == "v0":
-#         if tokenizer.pad_token is None:
-#             smart_tokenizer_and_embedding_resize(
-#                 special_tokens_dict=dict(pad_token="[PAD]"),
-#                 tokenizer=tokenizer,
-#                 model=model,
-#             )
-#     elif model_args.version == "v0.5":
-#         tokenizer.pad_token = tokenizer.unk_token
-#     elif model_args.version == "llama_v3":
-#         tokenizer.pad_token = "<|reserved_special_token_0|>"
-#         tokenizer.pad_token_id = 128002
-#     else:
-#         tokenizer.pad_token = tokenizer.unk_token
-#         if model_args.version in conversation_lib.conv_templates:
-#             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
-#         else:
-#             logger.warning(f"Conversation version {model_args.version} not found. Using default `vicuna_v1`")
-#             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
-
-#     # log_rank0(f"Default conversation version: {conversation_lib.default_conversation.version}")
-#     # print_rank0("Then it is", conversation_lib.default_conversation)
-
-#     if use_cohere:
-#         tokenizer.pad_token_id = 0
-#         print_rank0("tokenizer id is", tokenizer.pad_token_id)
-#     # print_rank0("tokenizer is", tokenizer)
-
-#     if model_args.vision_tower_aux_list is not None:
-#         model_args.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
-#         model_args.vision_tower_aux_list = json.loads(model_args.vision_tower_aux_list)
-#         model_args.vision_tower_aux_token_len_list = json.loads(model_args.vision_tower_aux_token_len_list)
-#         model_args.query_num_list = json.loads(model_args.query_num_list)
-#         model.get_model().initialize_vision_modules(
-#             model_args=model_args,
-#             fsdp=training_args.fsdp
-#         )
-#         model.config.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
-
-#         vision_tower_aux_list = None
-#         if model_args.vision_tower_aux_list is not None:
-#             vision_tower_aux_list = model.get_vision_tower_aux_list()
-        
-#         if not training_args.unfreeze_mm_vision_tower:
-#             # vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
-#             if vision_tower_aux_list is not None:
-#                 for vision_tower_aux in vision_tower_aux_list:
-#                     vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
-#         else:
-#             # vision_tower.to(device=training_args.device)
-#             if vision_tower_aux_list is not None:
-#                 for vision_tower_aux in vision_tower_aux_list:
-#                     vision_tower_aux.to(device=training_args.device)
-#                 # vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
-#         # data_args.image_processor = vision_tower.image_processor
-#         if vision_tower_aux_list is not None:
-#             data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
-#         data_args.is_multimodal = True
-
-#         model.config.image_aspect_ratio = data_args.image_aspect_ratio
-#         model.config.tokenizer_padding_side = tokenizer.padding_side
-#         model.config.tokenizer_model_max_length = tokenizer.model_max_length
-#         model.config.image_position = data_args.image_position
-
-#         model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = model_args.tune_mm_mlp_adapter
-#         if model_args.tune_mm_mlp_adapter:
-#             model.requires_grad_(False)
-#             # for p in model.get_model().mm_projector.parameters():
-#             #     p.requires_grad = True
-#             tune_modules = ['mm_projector', 'pos_emb', 'vision_sampler', 'vision_sampler_layers', 'vision_query', 'image_newline']
-#             for name, param in model.named_parameters():
-#                 if any(listed_name in name for listed_name in tune_modules):
-#                     print_rank0('tuning {}'.format(name))
-#                     param.requires_grad = True
-
-#         model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
-#         if training_args.freeze_mm_mlp_adapter:
-#             for p in model.get_model().mm_projector.parameters():
-#                 p.requires_grad = False
-#         if training_args.unfreeze_mm_vision_tower:
-#             if vision_tower_aux_list is not None:
-#                 for vision_tower_aux in vision_tower_aux_list:
-#                     for p in vision_tower_aux.parameters():
-#                         p.requires_grad = True
-
-#         if training_args.bits in [4, 8]:
-#             log_rank0(f"Initializing vision modules in {training_args.bits}bit")
-#             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
-
-#         model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
-#         model.config.image_token_len = data_args.image_token_len = model_args.image_token_len
-#         model.config.mm_projector_lr = training_args.mm_projector_lr
-#         model.config.mm_vision_sampler_lr = training_args.mm_vision_sampler_lr
-#         model.config.mm_vision_tower_lr = training_args.mm_vision_tower_lr
-#         training_args.use_im_start_end = model_args.mm_use_im_start_end
-#         model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
-#         model.config.vision_tower_aux_token_len_list = data_args.vision_tower_aux_token_len_list = model_args.vision_tower_aux_token_len_list
-#         model.config.image_token_len = data_args.image_token_len
-#         model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
-
-#     if training_args.bits in [4, 8]:
-#         log_rank0(f"Initializing model in {training_args.bits}bit")
-#         from peft.tuners.lora import LoraLayer
-#         for name, module in model.named_modules():
-#             if isinstance(module, LoraLayer):
-#                 if training_args.bf16:
-#                     module = module.to(torch.bfloat16)
-#             if 'norm' in name:
-#                 module = module.to(torch.float32)
-#             if 'lm_head' in name or 'embed_tokens' in name:
-#                 if hasattr(module, 'weight'):
-#                     if training_args.bf16 and module.weight.dtype == torch.float32:
-#                         module = module.to(torch.bfloat16)
-
-#     log_rank0("Configuring data module...")
-#     noise_level=[0,30,50]
-#     data_module = make_supervised_data_module(tokenizer=tokenizer,
-#                                               data_args=data_args, noise_level=noise_level)
-
-    
-
-#     if training_args.bf16:
-#         model = model.to(dtype=torch.float32)
-
-#     callbacks = []
-
-#     if "wandb" in training_args.report_to:
-#         wandb_nan_callback = NanInfAlertWandbCallback(metrics=["loss"])
-#         callbacks.append(wandb_nan_callback)
-#         # rm wandb from training_args.report_to so it doesn't get passed to the Trainer
-#         training_args.report_to.remove("wandb")
-#         assert "wandb" not in training_args.report_to, training_args.report_to
-
-
-#     log_rank0("Configuring trainer...")
-#     trainer = CambrianTrainer(model=model,
-#                     tokenizer=tokenizer,
-#                     args=training_args,
-#                     **data_module)
-#     trainer.is_fsdp_enabled = True
-#     if training_args.train_continue:
-#         resume_from_checkpoint=training_args.resume_from_checkpoint
-#         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-#     else:
-#         trainer.train()
-
-#     log_rank0(f"Training finished: {training_args.output_dir}")
-    
-#     trainer.save_state()
-
-#     model.config.use_cache = True
-
-#     log_rank0("Saving model...")
-#     if training_args.lora_enable:
-#         state_dict = get_peft_state_maybe_zero_3(
-#             model.named_parameters(), training_args.lora_bias
-#         )
-#         non_lora_state_dict = get_peft_state_non_lora_maybe_zero_3(
-#             model.named_parameters()
-#         )
-#         if training_args.local_rank == 0 or training_args.local_rank == -1:
-#             model.config.save_pretrained(training_args.output_dir)
-#             model.save_pretrained(training_args.output_dir, state_dict=state_dict)
-#             torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))
-#     else:
-#         safe_save_model_for_hf_trainer(trainer=trainer,
-#                                        output_dir=training_args.output_dir)
-import torch
-import os
-import json
-import re
-import transformers
-from transformers import TrainingArguments
-
 def convert_model_to_torchscript(model):
     # 将模型转换为TorchScript格式
     model_script = torch.jit.script(model)
     return model_script
 
 def train(INDEX, attn_implementation=None):
+
     global local_rank
     
     log_rank0(f"Training on index {INDEX}. Local rank: {local_rank}")
@@ -2004,7 +1619,7 @@ def train(INDEX, attn_implementation=None):
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
 
-    # Verify that the train_batch_size is set correctly
+    # verify that the train_batch_size is set correctly
     if training_args.batch_size is not None:
         if IS_XLA_AVAILABLE:
             import torch_xla.core.xla_model as xm
@@ -2019,6 +1634,7 @@ def train(INDEX, attn_implementation=None):
             logger.warning(f"per_device_train_batch_size is correctly set to {training_args.per_device_train_batch_size} with world_size {world_size} to match train_batch_size {training_args.batch_size}")
             logger.warning(f"train_batch_size is {training_args.train_batch_size}")
 
+    
     # TPU Note, the original LLaMA RMSNorm implementation has a bug here, the dtype conversion is not correct. It is ok in GPU but kills TPU training.
     def forward(self, hidden_states):
         input_dtype = hidden_states.dtype
@@ -2039,9 +1655,9 @@ def train(INDEX, attn_implementation=None):
     nn.Conv2d.forward = new_forward_conv
 
     def new_forward_linear(self, input):
-        if this.bias is None:
-            return F.linear(input, this.weight, this.bias)
-        return F.linear(input, this.weight, this.bias.to(input.dtype)).to(input.dtype)
+        if self.bias is None:
+            return F.linear(input, self.weight, self.bias)
+        return F.linear(input, self.weight, self.bias.to(input.dtype)).to(input.dtype)
 
     nn.Linear.forward = new_forward_linear
 
@@ -2070,8 +1686,11 @@ def train(INDEX, attn_implementation=None):
     data_args.image_token_len = model_args.image_token_len
 
     if model_args.vision_tower_aux_list is not None:
+        # copy image_token_len and image_position to model_args
+        # data_args.image_token_len = model_args.image_token_len
         model_args.image_position = data_args.image_position
 
+        
         # Assuming model_args.model_name_or_path is a string that includes the model size
         model_name = model_args.model_name_or_path
 
@@ -2148,7 +1767,6 @@ def train(INDEX, attn_implementation=None):
 
     log_rank0("Model loaded.")
 
-    # 转换模型为TorchScript格式
     model = convert_model_to_torchscript(model)
     log_rank0("Model converted to TorchScript.")
 
@@ -2214,7 +1832,7 @@ def train(INDEX, attn_implementation=None):
     elif model_args.version == "v0.5":
         tokenizer.pad_token = tokenizer.unk_token
     elif model_args.version == "llama_v3":
-        tokenizer.pad_token = ""
+        tokenizer.pad_token = "<|reserved_special_token_0|>"
         tokenizer.pad_token_id = 128002
     else:
         tokenizer.pad_token = tokenizer.unk_token
@@ -2224,9 +1842,13 @@ def train(INDEX, attn_implementation=None):
             logger.warning(f"Conversation version {model_args.version} not found. Using default `vicuna_v1`")
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
 
+    # log_rank0(f"Default conversation version: {conversation_lib.default_conversation.version}")
+    # print_rank0("Then it is", conversation_lib.default_conversation)
+
     if use_cohere:
         tokenizer.pad_token_id = 0
         print_rank0("tokenizer id is", tokenizer.pad_token_id)
+    # print_rank0("tokenizer is", tokenizer)
 
     if model_args.vision_tower_aux_list is not None:
         model_args.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
@@ -2244,13 +1866,17 @@ def train(INDEX, attn_implementation=None):
             vision_tower_aux_list = model.get_vision_tower_aux_list()
         
         if not training_args.unfreeze_mm_vision_tower:
+            # vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
             if vision_tower_aux_list is not None:
                 for vision_tower_aux in vision_tower_aux_list:
                     vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
         else:
+            # vision_tower.to(device=training_args.device)
             if vision_tower_aux_list is not None:
                 for vision_tower_aux in vision_tower_aux_list:
                     vision_tower_aux.to(device=training_args.device)
+                # vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
+        # data_args.image_processor = vision_tower.image_processor
         if vision_tower_aux_list is not None:
             data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
         data_args.is_multimodal = True
@@ -2263,6 +1889,8 @@ def train(INDEX, attn_implementation=None):
         model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = model_args.tune_mm_mlp_adapter
         if model_args.tune_mm_mlp_adapter:
             model.requires_grad_(False)
+            # for p in model.get_model().mm_projector.parameters():
+            #     p.requires_grad = True
             tune_modules = ['mm_projector', 'pos_emb', 'vision_sampler', 'vision_sampler_layers', 'vision_query', 'image_newline']
             for name, param in model.named_parameters():
                 if any(listed_name in name for listed_name in tune_modules):
@@ -2313,6 +1941,8 @@ def train(INDEX, attn_implementation=None):
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args, noise_level=noise_level)
 
+    
+
     if training_args.bf16:
         model = model.to(dtype=torch.float32)
 
@@ -2321,8 +1951,10 @@ def train(INDEX, attn_implementation=None):
     if "wandb" in training_args.report_to:
         wandb_nan_callback = NanInfAlertWandbCallback(metrics=["loss"])
         callbacks.append(wandb_nan_callback)
+        # rm wandb from training_args.report_to so it doesn't get passed to the Trainer
         training_args.report_to.remove("wandb")
         assert "wandb" not in training_args.report_to, training_args.report_to
+
 
     log_rank0("Configuring trainer...")
     trainer = CambrianTrainer(model=model,
@@ -2357,7 +1989,6 @@ def train(INDEX, attn_implementation=None):
     else:
         safe_save_model_for_hf_trainer(trainer=trainer,
                                        output_dir=training_args.output_dir)
-
 
 if __name__ == "__main__":
     train()
