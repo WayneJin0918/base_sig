@@ -1748,7 +1748,7 @@ def train(INDEX, attn_implementation=None):
         training_args.report_to.remove("wandb")
         assert "wandb" not in training_args.report_to, training_args.report_to
 
-    model = convert_model_to_torchscript(model, data_module)
+    model = convert_model_to_torchscript(model)
     log_rank0("Model converted to TorchScript.")
 
     log_rank0("Configuring trainer...")
