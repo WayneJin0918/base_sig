@@ -1791,8 +1791,38 @@ def train(INDEX, attn_implementation=None):
 
     model_args.vision_tower_aux_list = json.loads(model_args.vision_tower_aux_list)
     # 从数据模块中获取一个批次的数据作为示例输入
-    if vision_tower_aux_list is not None:
-        data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
+
+    if model_args.vision_tower_aux_list is not None:
+        model_args.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
+        model_args.vision_tower_aux_list = json.loads(model_args.vision_tower_aux_list)
+        model_args.vision_tower_aux_token_len_list = json.loads(model_args.vision_tower_aux_token_len_list)
+        model_args.query_num_list = json.loads(model_args.query_num_list)
+        model.get_model().initialize_vision_modules(
+            model_args=model_args,
+            fsdp=training_args.fsdp
+        )
+        model.config.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
+
+        vision_tower_aux_list = None
+        if model_args.vision_tower_aux_list is not None:
+            vision_tower_aux_list = model.get_vision_tower_aux_list()
+        
+        if not training_args.unfreeze_mm_vision_tower:
+            # vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
+            if vision_tower_aux_list is not None:
+                for vision_tower_aux in vision_tower_aux_list:
+                    vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
+        else:
+            # vision_tower.to(device=training_args.device)
+            if vision_tower_aux_list is not None:
+                for vision_tower_aux in vision_tower_aux_list:
+                    vision_tower_aux.to(device=training_args.device)
+                # vision_tower_aux.to(dtype=torch.bfloat16, device=training_args.device)
+        # data_args.image_processor = vision_tower.image_processor
+        if vision_tower_aux_list is not None:
+            data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
+        data_args.is_multimodal = True
+
     train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
     example_input = next(iter(train_dataloader))
 
