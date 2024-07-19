@@ -1824,8 +1824,8 @@ def train(INDEX, attn_implementation=None):
         data_args.is_multimodal = True
 
     train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
-    example_input = next(iter(train_dataloader))
-
+    example_batch = next(iter(train_dataloader))
+    example_batch = example_batch['input_ids']
     model = convert_model_to_torchscript(model, example_input)
     log_rank0("Model converted to TorchScript.")
 
