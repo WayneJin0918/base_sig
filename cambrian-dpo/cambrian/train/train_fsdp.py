@@ -1790,6 +1790,8 @@ def train(INDEX, attn_implementation=None):
                                               data_args=data_args, noise_level=noise_level)
 
     # 从数据模块中获取一个批次的数据作为示例输入
+    if vision_tower_aux_list is not None:
+        data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
     train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
     example_input = next(iter(train_dataloader))
 
