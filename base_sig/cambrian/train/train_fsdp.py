@@ -1754,7 +1754,7 @@ def train(INDEX, attn_implementation=None):
     example_batch = next(iter(train_dataloader))
 
     # 需要根据模型的输入格式进行调整
-    example_input = example_batch['input_ids']
+    example_input = example_batch
 
     model = convert_model_to_torchscript(model, example_input)
     log_rank0("Model converted to TorchScript.")
