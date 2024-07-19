@@ -1606,7 +1606,7 @@ if IS_XLA_AVAILABLE:
 
 def convert_model_to_torchscript(model, example_input):
     # 将模型转换为TorchScript格式
-    model_script = torch.jit.trace(model, example_input)
+    model_script = torch.jit.script(model, example_input)
     return model_script
 
 def train(INDEX, attn_implementation=None):
@@ -1953,13 +1953,7 @@ def train(INDEX, attn_implementation=None):
 
     train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
 
-    # 从DataLoader中获取一个批次的数据作为示例输入
-    example_batch = next(iter(train_dataloader))
-
-    # 需要根据模型的输入格式进行调整
-    example_input = example_batch['input_ids']
-
-    model = convert_model_to_torchscript(model, example_input)
+    model = convert_model_to_torchscript(model)
     log_rank0("Model converted to TorchScript.")
 
 
