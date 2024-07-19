@@ -1787,7 +1787,7 @@ def train(INDEX, attn_implementation=None):
                                               data_args=data_args, noise_level=noise_level)
 
     # 从数据模块中获取一个批次的数据作为示例输入
-    example_input = next(iter(data_module['train_dataloader']))
+    example_input = next(iter(data_module))
 
     model = convert_model_to_torchscript(model, example_input)
     log_rank0("Model converted to TorchScript.")
