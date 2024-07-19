@@ -1401,7 +1401,7 @@ if IS_XLA_AVAILABLE:
 
 def convert_model_to_torchscript(model, example_input):
     # 将模型转换为TorchScript格式
-    model_script = torch.jit.trace(model, example_input)
+    model_script = torch.jit.script(model, example_input)
     return model_script
 
 def train(INDEX, attn_implementation=None):
