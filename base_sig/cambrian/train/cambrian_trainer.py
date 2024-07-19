@@ -842,7 +842,7 @@ class CambrianTrainer(Trainer):
             loss = self.compute_loss(model, inputs)
 
         if self.args.n_gpu > 1:
-            loss = loss.mean()  # mean() to average on multi-gpu parallel training
+            loss = loss.mean()
 
         if self.use_apex:
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -850,7 +850,20 @@ class CambrianTrainer(Trainer):
         else:
             self.accelerator.backward(loss)
 
-        return loss.detach() / self.args.gradient_accumulation_steps
+        loss = loss.detach() / self.args.gradient_accumulation_steps
+
+        # Zero the gradients to avoid accumulating them
+        self.optimizer.zero_grad()
+
+        # Reduce gradients across TPU cores
+        xm.reduce_gradients(self.optimizer)
+
+        # Explicitly delete intermediate variables to free up memory
+        del inputs
+        xm.mark_step()
+
+        return loss
+
 
     def create_optimizer(self):
         if is_sagemaker_mp_enabled():
