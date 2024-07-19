@@ -1764,39 +1764,7 @@ def train(INDEX, attn_implementation=None):
     model.config.use_cache = False
     model.generation_config.do_sample = True
 
-    if 'mpt' in model_args.model_name_or_path:
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            model_max_length=training_args.model_max_length,
-            padding_side="right"
-        )
-    else:
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            model_max_length=training_args.model_max_length,
-            padding_side="right",
-            use_fast=False,
-        )
-    tokenizer.pad_token = "<|reserved_special_token_0|>"
-    tokenizer.pad_token_id = 128002
-    if model_args.freeze_backbone:
-        model.model.requires_grad_(False)
-
     log_rank0("Model loaded.")
-    # 伪造一个示例输入
-    example_input_ids = torch.randint(0, tokenizer.vocab_size, (1, data_args.image_token_len)).to(torch.long)
-    example_attention_mask = torch.ones_like(example_input_ids)
-
-    example_input = {
-        'input_ids': example_input_ids,
-        'attention_mask': example_attention_mask
-    }
-
-    model = convert_model_to_torchscript(model, (example_input['input_ids'], example_input['attention_mask']))
-
-    log_rank0("Model converted to TorchScript.")
 
     if training_args.bits in [4, 8]:
         from peft import prepare_model_for_kbit_training
@@ -1982,6 +1950,17 @@ def train(INDEX, attn_implementation=None):
         # rm wandb from training_args.report_to so it doesn't get passed to the Trainer
         training_args.report_to.remove("wandb")
         assert "wandb" not in training_args.report_to, training_args.report_to
+
+    train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
+
+    # 从DataLoader中获取一个批次的数据作为示例输入
+    example_batch = next(iter(train_dataloader))
+
+    # 需要根据模型的输入格式进行调整
+    example_input = example_batch['input_ids']
+
+    model = convert_model_to_torchscript(model, example_input)
+    log_rank0("Model converted to TorchScript.")
 
 
     log_rank0("Configuring trainer...")
