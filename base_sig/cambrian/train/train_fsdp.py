@@ -1399,9 +1399,9 @@ if IS_XLA_AVAILABLE:
     from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel
     XlaFullyShardedDataParallel._shard_parameters_ = _shard_parameters_
 
-def convert_model_to_torchscript(model, example_input):
+def convert_model_to_torchscript(model):
     # 将模型转换为TorchScript格式
-    model_script = torch.jit.script(model, example_input)
+    model_script = torch.jit.script(model)
     return model_script
 
 def train(INDEX, attn_implementation=None):
