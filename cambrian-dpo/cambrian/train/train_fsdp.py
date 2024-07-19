@@ -1762,6 +1762,22 @@ def train(INDEX, attn_implementation=None):
     model.config.use_cache = False
     model.generation_config.do_sample = True
 
+    if 'mpt' in model_args.model_name_or_path:
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=training_args.cache_dir,
+            model_max_length=training_args.model_max_length,
+            padding_side="right"
+        )
+    else:
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=training_args.cache_dir,
+            model_max_length=training_args.model_max_length,
+            padding_side="right",
+            use_fast=False,
+        )
+
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
 
