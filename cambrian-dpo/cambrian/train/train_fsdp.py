@@ -1598,6 +1598,8 @@ def _shard_parameters_(self, params_to_shard) -> None:
 
     assert len(self.sharded_params) == len(self.full_params)
 
+from torch.utils.data import DataLoader
+
 if IS_XLA_AVAILABLE:
     from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel
     XlaFullyShardedDataParallel._shard_parameters_ = _shard_parameters_
