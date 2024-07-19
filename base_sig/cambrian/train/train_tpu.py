@@ -9,4 +9,4 @@ if __name__ == "__main__":
     import multiprocessing as mp
     import torch_xla.distributed.xla_multiprocessing as xmp
     mp.set_start_method('spawn', force=True)
-    xmp.spawn(train, args=(None,))
+    xmp.spawn(train, args=None)
