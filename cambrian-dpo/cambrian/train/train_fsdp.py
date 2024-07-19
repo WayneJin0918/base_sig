@@ -1786,10 +1786,6 @@ def train(INDEX, attn_implementation=None):
 
     log_rank0("Model loaded.")
     noise_level=[0,30,50]
-    data_module = make_supervised_data_module(tokenizer=tokenizer,
-                                              data_args=data_args, noise_level=noise_level)
-
-
 
     vision_tower_aux_list = model.get_vision_tower_aux_list()
         
@@ -1807,6 +1803,9 @@ def train(INDEX, attn_implementation=None):
         # data_args.image_processor = vision_tower.image_processor
     if vision_tower_aux_list is not None:
             data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
+
+    data_module = make_supervised_data_module(tokenizer=tokenizer,
+                                              data_args=data_args, noise_level=noise_level)
 
     train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
     example_batch = next(iter(train_dataloader))
