@@ -257,7 +257,7 @@ class CambrianTrainer(Trainer):
         model.train()
         inputs = self._prepare_inputs(inputs)
         import numpy as np
-        print(inputs)
+        # print(inputs)
         # # 打印输入的形状
         # for k, v in inputs.items():
         #     if isinstance(v, list):
