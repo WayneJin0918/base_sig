@@ -14,8 +14,8 @@ python cambrian/train/train_tpu.py \
     --data_path /home/wayneyjin/Cambrian7M.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
     --pretrain_mm_mlp_adapter /home/wayneyjin/model_ckpt/cambrian-8b-pretrain/mm_projector.bin \
-    --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384", "openai/clip-vit-large-patch14-336", "facebook/dinov2-giant-res378", "clip-convnext-XXL-multi-stage"]' \
-    --vision_tower_aux_token_len_list '[576, 576, 576, 9216]' \
+    --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
+    --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
     --num_query_group 1 \
     --query_num_list '[576]' \
@@ -23,7 +23,7 @@ python cambrian/train/train_tpu.py \
     --image_position 91 \
     --vision_hidden_size 1024 \
     --connector_only False \
-    --num_of_vision_sampler_layers 10 \
+    --num_of_vision_sampler_layers 5 \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
