@@ -266,6 +266,10 @@ class CambrianTrainer(Trainer):
         model.train()
         inputs = self._prepare_inputs(inputs)
 
+        # 打印输入的形状
+        for k, v in inputs.items():
+            print(f"{k} shape: {v.shape}")
+
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
             return loss_mb.reduce_mean().detach().to(self.args.device)
