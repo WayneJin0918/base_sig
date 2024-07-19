@@ -1789,6 +1789,7 @@ def train(INDEX, attn_implementation=None):
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args, noise_level=noise_level)
 
+    model_args.vision_tower_aux_list = json.loads(model_args.vision_tower_aux_list)
     # 从数据模块中获取一个批次的数据作为示例输入
     if vision_tower_aux_list is not None:
         data_args.image_processor_aux_list = [vision_tower_aux.image_processor for vision_tower_aux in vision_tower_aux_list]
