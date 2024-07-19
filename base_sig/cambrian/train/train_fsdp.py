@@ -1748,15 +1748,7 @@ def train(INDEX, attn_implementation=None):
         training_args.report_to.remove("wandb")
         assert "wandb" not in training_args.report_to, training_args.report_to
 
-    train_dataloader = DataLoader(data_module['train_dataset'], batch_size=training_args.per_device_train_batch_size, collate_fn=data_module['data_collator'])
-
-    # 从DataLoader中获取一个批次的数据作为示例输入
-    example_batch = next(iter(train_dataloader))
-
-    # 需要根据模型的输入格式进行调整
-    example_input = example_batch
-
-    model = convert_model_to_torchscript(model, example_input)
+    model = convert_model_to_torchscript(model, data_module)
     log_rank0("Model converted to TorchScript.")
 
     log_rank0("Configuring trainer...")
