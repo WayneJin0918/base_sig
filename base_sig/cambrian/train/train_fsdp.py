@@ -1399,10 +1399,6 @@ if IS_XLA_AVAILABLE:
     from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel
     XlaFullyShardedDataParallel._shard_parameters_ = _shard_parameters_
 
-def convert_model_to_torchscript(model):
-    # 将模型转换为TorchScript格式
-    model_script = torch.jit.script(model)
-    return model_script
 
 def train(INDEX, attn_implementation=None):
 
@@ -1747,9 +1743,6 @@ def train(INDEX, attn_implementation=None):
         # rm wandb from training_args.report_to so it doesn't get passed to the Trainer
         training_args.report_to.remove("wandb")
         assert "wandb" not in training_args.report_to, training_args.report_to
-
-    model = convert_model_to_torchscript(model)
-    log_rank0("Model converted to TorchScript.")
 
     log_rank0("Configuring trainer...")
     trainer = CambrianTrainer(model=model,
