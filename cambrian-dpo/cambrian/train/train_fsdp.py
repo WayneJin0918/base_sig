@@ -1602,9 +1602,9 @@ if IS_XLA_AVAILABLE:
     from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel
     XlaFullyShardedDataParallel._shard_parameters_ = _shard_parameters_
 
-def convert_model_to_torchscript(model):
+def convert_model_to_torchscript(model, example_input):
     # 将模型转换为TorchScript格式
-    model_script = torch.jit.trace(model)
+    model_script = torch.jit.trace(model, example_input)
     return model_script
 
 def train(INDEX, attn_implementation=None):
@@ -1767,7 +1767,13 @@ def train(INDEX, attn_implementation=None):
 
     log_rank0("Model loaded.")
 
-    model = convert_model_to_torchscript(model)
+    data_module = make_supervised_data_module(tokenizer=tokenizer,
+                                              data_args=data_args, noise_level=noise_level)
+
+    # 从数据模块中获取一个批次的数据作为示例输入
+    example_input = next(iter(data_module['train_dataloader']))
+
+    model = convert_model_to_torchscript(model, example_input)
     log_rank0("Model converted to TorchScript.")
 
     if training_args.bits in [4, 8]:
