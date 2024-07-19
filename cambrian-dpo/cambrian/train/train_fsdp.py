@@ -1779,7 +1779,8 @@ def train(INDEX, attn_implementation=None):
             padding_side="right",
             use_fast=False,
         )
-
+    tokenizer.pad_token = "<|reserved_special_token_0|>"
+    tokenizer.pad_token_id = 128002
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
 
