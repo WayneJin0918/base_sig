@@ -237,6 +237,7 @@ def map_params_to_module_names(model_list):
 
 class CambrianTrainer(Trainer):
 
+
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
@@ -255,9 +256,12 @@ class CambrianTrainer(Trainer):
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
         inputs = self._prepare_inputs(inputs)
+        import numpy as np
 
         # 打印输入的形状
         for k, v in inputs.items():
+            if isinstance(v, list):
+                v = np.array(v)  # 将 list 转换为 numpy 数组
             print(f"{k} shape: {v.shape}")
 
         if is_sagemaker_mp_enabled():
