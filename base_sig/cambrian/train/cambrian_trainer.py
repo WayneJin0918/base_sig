@@ -560,10 +560,10 @@ class CambrianTrainer(Trainer):
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
         run_dir = self._get_output_dir(trial=trial)
         output_dir = os.path.join(run_dir, checkpoint_folder)
+        os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
 
         model = self.model
-        import torch_xla.core.xla_model as xm
         rank = xm.get_ordinal()
         world_size = xm.xrt_world_size()
 
@@ -587,25 +587,22 @@ class CambrianTrainer(Trainer):
             'shard_metadata': self.model.get_shard_metadata()
         }
         opt_ckpt = {
-            'optimizer_state' : self.optimizer.state_dict(),
+            'optimizer_state': self.optimizer.state_dict(),
             'shard_metadata': self.model.get_shard_metadata()
         }
 
-        # Saving model shards
-        with fs.open(SHARD_NAME_PATH, 'wb') as f:
-            xm.save(ckpt, f, master_only=False)
+        # Saving model shards locally
+        torch.save(ckpt, SHARD_NAME_PATH)
 
-        # Saving optimizer shards
-        with fs.open(SHARD_NAME_OPT_PATH, 'wb') as f:
-            xm.save(opt_ckpt, f, master_only=False)
+        # Saving optimizer shards locally
+        torch.save(opt_ckpt, SHARD_NAME_OPT_PATH)
 
-        # saving lr scheduler and train state json
+        # saving lr scheduler and train state json locally
         if xm.is_master_ordinal(local=False):
-            with fs.open(LR_PATH, 'wb') as f:
-                xm.save(lr_scheduler_state_dict, f, master_only=True)
+            torch.save(lr_scheduler_state_dict, LR_PATH)
 
             json_string = json.dumps(dataclasses.asdict(self.state), indent=2, sort_keys=True) + "\n"
-            with fs.open(TRAINER_STATE_NAME_PATH, 'w') as f:
+            with open(TRAINER_STATE_NAME_PATH, 'w') as f:
                 f.write(json_string)
 
         rng_states = {
@@ -614,8 +611,7 @@ class CambrianTrainer(Trainer):
             "cpu": torch.random.get_rng_state(),
         }
         rng_states["xla"] = xm.get_rng_state()
-        with fs.open(RNG_PATH, 'wb') as f:
-            torch.save(rng_states, f)
+        torch.save(rng_states, RNG_PATH)
 
     # def _save_checkpoint(self, model, trial, metrics=None):
     #     if getattr(self.args, 'tune_mm_mlp_adapter', False):
