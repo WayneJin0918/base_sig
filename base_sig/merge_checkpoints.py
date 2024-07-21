@@ -244,9 +244,9 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--ckpt_path', type=str, required=True)
-    parser.add_argument('--ckpt_prefix', type=str, default='weights_rank-')
-    parser.add_argument('--ckpt_suffix', type=str, default='*-pytorch_model.bin')
-    parser.add_argument('--save_filename', type=str, default='full_model.bin')
+    parser.add_argument('--ckpt_prefix', type=str, default='mm_projector')
+    parser.add_argument('--ckpt_suffix', type=str, default='_rank-*-of-*.pth')
+    parser.add_argument('--save_filename', type=str, default='mm_projector.pth')
     parser.add_argument('--skip_existing', action='store_true', default=False, help='Skip if the save path already exists')
     args = parser.parse_args()
 
