@@ -8,7 +8,7 @@ export CKPT_NAME="cambrian-8b-pretrain-all" &&
 export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path /home/wayneyjin/ckpt/cambrian-8b-pretrain-all/checkpoint-3926 \
     --version llama_v3 \
     --data_path /home/wayneyjin/alignment_2.5m.jsonl \
     --image_folder /home/wayneyjin/pretrain_data \
