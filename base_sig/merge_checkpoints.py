@@ -5,11 +5,17 @@ import torch_xla.distributed.xla_multiprocessing as xmp
 from safetensors.torch import save_file
 from transformers import AutoConfig, AutoTokenizer
 import argparse
+from google.cloud import storage
+import io
 
-def download_file_from_gcs(gcs_path, local_path):
-    if not os.path.exists(local_path):
-        os.system(f'gsutil cp {gcs_path} {local_path}')
-        print(f"Downloaded {gcs_path} to {local_path}")
+def download_shard_from_gcs(bucket_name, shard_name, local_path):
+    client = storage.Client()
+    bucket = client.get_bucket(bucket_name)
+    blob = bucket.blob(shard_name)
+    blob_bytes = blob.download_as_bytes()
+    with open(local_path, 'wb') as f:
+        f.write(blob_bytes)
+    print(f"Downloaded {shard_name} to {local_path}")
 
 def load_shard(local_path):
     shard = torch.load(local_path, map_location="cpu")  # Load shard on CPU
@@ -31,12 +37,14 @@ def save_merged_model(output_dir, state_dict, config, tokenizer):
 def tpu_main(index, ckpt_prefix, output_dir, config_name, tokenizer_name, num_shards):
     rank = xm.get_ordinal()
     world_size = xm.xrt_world_size()
-
-    gcs_path = f"{ckpt_prefix}-{rank:08d}-of-{num_shards:08d}-pytorch_model.bin"
+    
+    # Define GCS bucket and shard path
+    bucket_name = "us-central2-storage"
+    shard_name = f'{ckpt_prefix}-{rank:08d}-of-{num_shards:08d}-pytorch_model.bin'
     local_path = f"/tmp/weights_rank-{rank:08d}-of-{num_shards:08d}-pytorch_model.bin"
 
     # Download shard from GCS to local path
-    download_file_from_gcs(gcs_path, local_path)
+    download_shard_from_gcs(bucket_name, shard_name, local_path)
 
     print(f"Loading model shard on rank {rank}...")
     local_shard = load_shard(local_path)
@@ -76,4 +84,4 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    xmp.spawn(tpu_main, args=(args.ckpt_prefix, args.output_dir, args.config_name, args.tokenizer_name, args.num_shards), nprocs=1)
+    xmp.spawn(tpu_main, args=(args.ckpt_prefix, args.output_dir, args.config_name, args.tokenizer_name, args.num_shards), nprocs=8)
