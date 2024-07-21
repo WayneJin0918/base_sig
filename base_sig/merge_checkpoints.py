@@ -1,87 +1,255 @@
 import os
+from glob import glob
+
+from collections import OrderedDict
+from tqdm import tqdm
+
 import torch
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.xla_multiprocessing as xmp
-from safetensors.torch import save_file
-from transformers import AutoConfig, AutoTokenizer
-import argparse
-from google.cloud import storage
-import io
 
-def download_shard_from_gcs(bucket_name, shard_name, local_path):
-    client = storage.Client()
-    bucket = client.get_bucket(bucket_name)
-    blob = bucket.blob(shard_name)
-    blob_bytes = blob.download_as_bytes()
-    with open(local_path, 'wb') as f:
-        f.write(blob_bytes)
-    print(f"Downloaded {shard_name} to {local_path}")
 
-def load_shard(local_path):
-    shard = torch.load(local_path, map_location="cpu")  # Load shard on CPU
-    return shard
+def _numel(shape):
+    numel = 1
+    for d in shape:
+        numel *= d
+    return numel
 
-def average_shards(local_state_dict, world_size):
-    for key in local_state_dict.keys():
-        local_state_dict[key] = local_state_dict[key] / world_size
-    return local_state_dict
 
-def save_merged_model(output_dir, state_dict, config, tokenizer):
-    os.makedirs(output_dir, exist_ok=True)
-    model_path = os.path.join(output_dir, "model.safetensors")
-    save_file(state_dict, model_path)
-    config.save_pretrained(output_dir)
-    tokenizer.save_pretrained(output_dir)
-    print(f'Model saved to {output_dir}')
+def _consolidate_param(state_dict_list, shard_metadata, name, prefix, suffix):
+    p_shard_list = []
+    for state_dict in state_dict_list:
+        p_shard = state_dict[name]
+        p_shard_list.append(p_shard)
 
-def tpu_main(index, ckpt_prefix, output_dir, config_name, tokenizer_name, num_shards):
-    rank = xm.get_ordinal()
-    world_size = xm.xrt_world_size()
-    
-    # Define GCS bucket and shard path
-    bucket_name = "us-central2-storage"
-    shard_name = f'{ckpt_prefix}-{rank:08d}-of-{num_shards:08d}-pytorch_model.bin'
-    local_path = f"/tmp/weights_rank-{rank:08d}-of-{num_shards:08d}-pytorch_model.bin"
+        # if prefix not in shard_metadata["shard_info"]:
+        #   prefix = prefix.replace('_fpw_module.', '')
+        p_info = shard_metadata["shard_info"][prefix][suffix]
+        orig_name = p_info["_orig_name"]
+        orig_size = p_info["_orig_size"]
 
-    # Download shard from GCS to local path
-    download_shard_from_gcs(bucket_name, shard_name, local_path)
+    full_param = torch.cat(p_shard_list, dim=0)
+    if full_param.dim() == 1:
+        # it's a flattened tensor as in the (usual) case with `shard_param_on_dim_0=False`
+        full_param = full_param[:_numel(orig_size)].view(*orig_size)
+    else:
+        # handle those FSDP models trained with `shard_param_on_dim_0=True`
+        full_param = full_param[:orig_size[0]]
 
-    print(f"Loading model shard on rank {rank}...")
-    local_shard = load_shard(local_path)
+    full_name = orig_name
+    if prefix != "":
+        full_name = prefix + "." + orig_name
 
-    # Convert local shard to XLA tensor
-    local_shard = {k: v.to(xm.xla_device()) for k, v in local_shard.items()}
+    return full_param, full_name
 
-    print(f"Averaging model shards on rank {rank}...")
-    local_shard = average_shards(local_shard, world_size)
 
-    global_state_dict = {}
-    for key in local_shard.keys():
-        global_state_dict[key] = xm.all_reduce('sum', [local_shard[key]], scale=1.0)
+def _unflatten_param(p, metadata, prefix):
+    param_names, param_shapes, param_numels = metadata
+    full_params = [
+        t.view(s) for (t, s) in zip(p.split(param_numels), param_shapes)
+    ]
+    full_names = param_names
+    if prefix != "":
+        full_names = [prefix + "." + n for n in full_names]
+    return full_params, full_names
 
-    xm.rendezvous('average_shards')
 
-    if rank == 0:
-        print(f"Loading config and tokenizer from {config_name} and {tokenizer_name}...")
-        config = AutoConfig.from_pretrained(config_name)
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+def consolidate_sharded_state_dicts(state_dict_list, shard_metadata):
+    """
+    Consolidate the sharded FSDP model state dicts.
 
-        # Convert global state dict back to CPU for saving
-        global_state_dict = {k: v.cpu() for k, v in global_state_dict.items()}
+    Args:
+        state_dict_list (OrderedDict):
+            a list of ``model.state_dict()`` obtained from the FSDP model of
+            each rank, **sorted in ascending order by their ranks**
+        shard_metadata (dict):
+            ``model.get_shard_metadata()`` from an FSDP model of any rank
 
-        print(f"Saving merged model to {output_dir}...")
-        save_merged_model(output_dir, global_state_dict, config, tokenizer)
-        print("Model merging complete.")
+    Returns:
+        full_state_dict: the consolidated model state dict
+    """
+    assert len(state_dict_list) == shard_metadata["world_size"]
+    full_state_dict = OrderedDict()
+    buffer_info = shard_metadata.get("buffer_info", {})
 
-def parse_args():
+    unsharded_flag = False
+
+    # consolidate the sharded parameters
+    for name, p in state_dict_list[0].items():
+        if name in buffer_info:  # cast buffer back to its original dtype
+            p = p.to(buffer_info[name]["_orig_dtype"])
+
+        is_sharded = False
+        name_splits = name.split(".")
+        for idx, sep in enumerate(name_splits):
+            if sep.startswith("_fsdp_shard"):
+                is_sharded = True
+                prefix = ".".join(name_splits[:idx])
+                suffix = ".".join(name_splits[idx:])
+                break
+
+        if is_sharded:
+            full_param, full_name = _consolidate_param(state_dict_list,
+                                                       shard_metadata, name, prefix,
+                                                       suffix)
+        else:
+            print(name)
+            unsharded_flag = True
+            # unsharded buffers (we'll just use rank 0's state dict for buffers)
+            full_param, full_name = p, name
+        full_state_dict[full_name] = full_param
+
+    for state_dict in state_dict_list:
+        if unsharded_flag:
+            break
+        for name, p in state_dict.items():
+            if name in buffer_info:  # cast buffer back to its original dtype
+                p = p.to(buffer_info[name]["_orig_dtype"])
+
+            is_sharded = False
+            name_splits = name.split(".")
+            for idx, sep in enumerate(name_splits):
+                if sep.startswith("_fsdp_shard"):
+                    is_sharded = True
+                    prefix = ".".join(name_splits[:idx])
+                    suffix = ".".join(name_splits[idx:])
+                    break
+            if is_sharded:
+                continue
+            else:
+                unsharded_flag = True
+                # unsharded buffers (we'll just use rank 0's state dict for buffers)
+                full_param, full_name = p, name
+            full_state_dict[full_name] = full_param
+
+    # unflatten the parameters
+    flatten_info = shard_metadata["flatten_info"]
+    for name in list(full_state_dict):
+        if "_fsdp_wrapped_module.flat_param_" in name:
+            p = full_state_dict.pop(name)
+            metadata = flatten_info[name]
+            prefix = ".".join(name.split(".")[:-1])
+            full_params, full_names = _unflatten_param(p, metadata, prefix)
+            for fp, fn in zip(full_params, full_names):
+                full_state_dict[fn] = fp
+
+    full_state_dict = OrderedDict(
+        (k.replace("_fsdp_wrapped_module.", "").replace("_fpw_module.", ""), v)
+        for k, v in full_state_dict.items())
+
+    return full_state_dict
+
+
+def consolidate_sharded_model_checkpoints(ckpt_prefix,
+                                          ckpt_suffix="*.pth",
+                                          save_path="",
+                                          save_model=True):
+    """
+    Consolidate the sharded FSDP checkpoints into a single model checkpoint.
+
+    Args:
+        ckpt_prefix (str):
+            prefix to FSDP checkpoint files from all ranks
+        ckpt_suffix (str, Optional):
+            suffix to FSDP checkpoint files from all ranks. Files matching the
+            pattern ``ckpt_prefix + ckpt_suffix`` will be loaded. The each
+            checkpoint file is assumed to be a dict with a "model" key
+            containing the FSDP model's ``model.state_dict()`` and a
+            "shard_metadata" key containing the FSDP model's
+            ``model.get_shard_metadata()``.
+        save_path (str, Optional):
+            the save path to the consolidated model checkpoint file (if
+            ``save_model`` is ``True``). The checkpoint file is a dict with a
+            "model" key containing the consolidated model state dict.
+        save_model (str, Optional):
+            if ``True``, the consolidated model checkpoint will be saved to
+            ``save_path`` (or ``ckpt_prefix + "_consolidated.pth"`` if
+            ``save_path`` is empty).
+
+    Returns:
+        full_state_dict: the consolidated model state dict
+        actual_save_path: the path to the consolidated model checkpoint file
+            (``None`` if ``save_model`` is ``False``)
+    """
+    ckpt_path_pattern = ckpt_prefix + ckpt_suffix
+    ckpt_paths = glob(ckpt_path_pattern)
+    assert len(
+        ckpt_paths) > 0, f"Cannot find any files matching {ckpt_path_pattern}."
+    print(f"found {len(ckpt_paths)} checkpoint files in {ckpt_path_pattern}")
+    checkpoints_and_paths = []
+    for path in tqdm(ckpt_paths, desc="loading checkpoints"):
+        ckpt = torch.load(path, map_location="cpu")
+        checkpoints_and_paths.append((ckpt, path))
+    checkpoints_and_paths.sort(key=lambda c: c[0]["shard_metadata"]["rank"])
+    checkpoints = [c[0] for c in checkpoints_and_paths]
+    for rank, (ckpt, path) in enumerate(checkpoints_and_paths):
+        assert ckpt["shard_metadata"]["world_size"] == len(checkpoints), (
+            f'Expecting {ckpt["shard_metadata"]["world_size"]} files '
+            f"(based on metadata in {path}) but got {len(checkpoints)} files. "
+            f"Please check if you have missing or unexpected files in {ckpt_path_pattern}."
+        )
+        assert ckpt["shard_metadata"]["rank"] == rank, (
+            f'Expecting rank {ckpt["shard_metadata"]["rank"]} for {path} but it is '
+            f"ranked {rank} (out of {len(checkpoints)} files). "
+            f"Please check if you have missing or unexpected files in {ckpt_path_pattern}."
+        )
+
+    state_dict_list = [ckpt["model"] for ckpt in checkpoints]
+    shard_metadata = checkpoints[0]["shard_metadata"]
+    full_state_dict = consolidate_sharded_state_dicts(state_dict_list,
+                                                      shard_metadata)
+
+    actual_save_path = None
+    if save_model:
+        actual_save_path = save_path if save_path else ckpt_prefix + "_consolidated.pth"
+        torch.save({"model": full_state_dict}, actual_save_path)
+        print(f"saved consolidated model to {actual_save_path}")
+
+    return full_state_dict, actual_save_path
+
+
+def main(ckpt_path, ckpt_prefix, ckpt_suffix, save_path, skip_existing=False):
+
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(f"Checkpoint path {ckpt_path} does not exist")
+    elif not os.path.isdir(ckpt_path):
+        raise FileNotFoundError(
+            f"Checkpoint path {ckpt_path} is not a directory")
+    elif os.path.exists(save_path):
+        if skip_existing:
+            print(f"Save path {save_path} already exists. Passed `skip_existing=True`, skipping...")
+            return
+        print(f"Save path {save_path} already exists. Passed `skip_existing=False`, overwriting...")
+
+    print(f"""Consolidating checkpoints:
+    Path: {ckpt_path}
+    Prefix: {ckpt_prefix}
+    Suffix: {ckpt_suffix}
+    Saving to: {save_path}
+    """)
+
+    ckpt_prefix = os.path.join(ckpt_path, ckpt_prefix)
+
+    state_dict, _ = consolidate_sharded_model_checkpoints(
+        ckpt_prefix=ckpt_prefix,
+        ckpt_suffix=ckpt_suffix,
+        save_model=False
+    )
+
+    print(f"Successfully consolidated checkpoints. Saving to {save_path}")
+    torch.save(state_dict, save_path)
+
+    print(f"Saved consolidated model to {save_path}")
+
+
+if __name__ == '__main__':
+    import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ckpt_prefix', type=str, required=True, help='Path prefix to the checkpoint shards')
-    parser.add_argument('--output_dir', type=str, required=True, help='Output directory to save the merged model')
-    parser.add_argument('--config_name', type=str, required=True, help='Pretrained model config path')
-    parser.add_argument('--tokenizer_name', type=str, required=True, help='Pretrained tokenizer path')
-    parser.add_argument('--num_shards', type=int, required=True, help='Number of shards')
-    return parser.parse_args()
+    parser.add_argument('--ckpt_path', type=str, required=True)
+    parser.add_argument('--ckpt_prefix', type=str, default='weights_rank-00000000-of-00000064-pytorch_model')
+    parser.add_argument('--ckpt_suffix', type=str, default='_rank-*-of-*.bin')
+    parser.add_argument('--save_filename', type=str, default='full_model.bin')
+    parser.add_argument('--skip_existing', action='store_true', default=False, help='Skip if the save path already exists')
+    args = parser.parse_args()
 
-if __name__ == "__main__":
-    args = parse_args()
-    xmp.spawn(tpu_main, args=(args.ckpt_prefix, args.output_dir, args.config_name, args.tokenizer_name, args.num_shards), nprocs=8)
+    save_path = os.path.join(args.ckpt_path, args.save_filename)
+
+    main(args.ckpt_path, args.ckpt_prefix, args.ckpt_suffix, save_path, args.skip_existing)
