@@ -2,18 +2,18 @@
 export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base" &&
+export CKPT_NAME="cambrian-8b-finetune" &&
 export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
 
-export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
+export CKPT_DIR="/home/wayneyjin/model_ckpt/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/cambrian/cambrian-8b \
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
-    --pretrain_mm_mlp_adapter /home/wayneyjin/base_sig/checkpoints/cambrian-8b-pretrain-all/mm_projector.pth \
+    --pretrain_mm_mlp_adapter /home/wayneyjin/model_ckpt/cambrian-8b-pretrain/mm_projector.bin \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
     --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
@@ -23,7 +23,7 @@ python cambrian/train/train_tpu.py \
     --image_position 91 \
     --vision_hidden_size 1024 \
     --connector_only False \
-    --num_of_vision_sampler_layers 10 \
+    --num_of_vision_sampler_layers 5 \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
@@ -33,11 +33,11 @@ python cambrian/train/train_tpu.py \
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
-    --bf16 False \
+    --bf16 True \
     --output_dir $CKPT_DIR \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 8 \
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
@@ -51,7 +51,7 @@ python cambrian/train/train_tpu.py \
     --tf32 False \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 8 \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
@@ -66,5 +66,5 @@ if [ ! -d "$CKPT_PATH" ]; then
     exit 1
 fi
 echo "Training finished. Syncing checkpoints to GCS..."
-gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
-echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
+gcloud alpha storage rsync $CKPT_PATH gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME
+echo "Syncing finished. Checkpoints are now available at gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME"
