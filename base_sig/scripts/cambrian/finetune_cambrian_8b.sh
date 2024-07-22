@@ -9,11 +9,11 @@ export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/cambrian_ckpts/llama3ckpts \
+    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
-    --pretrain_mm_mlp_adapter /home/wayneyjin/model_ckpt/cambrian-8b-pretrain/mm_projector.bin \
+    --pretrain_mm_mlp_adapter /home/wayneyjin/base_sig/checkpoints/cambrian-8b-pretrain-all/mm_projector.pth \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
     --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
@@ -66,5 +66,5 @@ if [ ! -d "$CKPT_PATH" ]; then
     exit 1
 fi
 echo "Training finished. Syncing checkpoints to GCS..."
-gcloud alpha storage rsync $CKPT_PATH gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME
-echo "Syncing finished. Checkpoints are now available at gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME"
+gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
+echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
