@@ -1,0 +1,44 @@
+Metadata-Version: 2.1
+Name: cambrian
+Version: 1.0.0
+Summary: A Fully Open, Vision-Centric Exploration of Multimodal LLMs.
+Project-URL: Homepage, https://cambrian-mllm.github.io/
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: torch==2.2.0
+Requires-Dist: torchvision==0.17.0
+Requires-Dist: transformers==4.37.0
+Requires-Dist: tokenizers==0.15.0
+Requires-Dist: sentencepiece==0.1.99
+Requires-Dist: shortuuid
+Requires-Dist: accelerate==0.23.0
+Requires-Dist: peft==0.4.0
+Requires-Dist: pydantic
+Requires-Dist: markdown2[all]
+Requires-Dist: numpy==1.26.4
+Requires-Dist: scikit-learn==1.2.2
+Requires-Dist: requests
+Requires-Dist: httpx==0.24.0
+Requires-Dist: uvicorn
+Requires-Dist: fastapi
+Requires-Dist: einops==0.6.1
+Requires-Dist: einops-exts==0.0.4
+Requires-Dist: timm==0.9.16
+Requires-Dist: open_clip_torch
+Requires-Dist: diffusers[torch]
+Requires-Dist: torchtext==0.17.0
+Requires-Dist: ezcolorlog
+Requires-Dist: gcsfs
+Provides-Extra: gpu
+Requires-Dist: bitsandbytes==0.41.0; extra == "gpu"
+Requires-Dist: deepspeed==0.12.6; extra == "gpu"
+Requires-Dist: ninja; extra == "gpu"
+Requires-Dist: wandb; extra == "gpu"
+Requires-Dist: fastapi; extra == "gpu"
+Requires-Dist: gradio==4.16.0; extra == "gpu"
+Requires-Dist: gradio_client==0.8.1; extra == "gpu"
+Provides-Extra: tpu
+Requires-Dist: ninja; extra == "tpu"
+Requires-Dist: wandb; extra == "tpu"
