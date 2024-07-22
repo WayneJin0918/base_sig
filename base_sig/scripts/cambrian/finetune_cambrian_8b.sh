@@ -13,7 +13,7 @@ python cambrian/train/train_tpu.py \
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
-    --pretrain_mm_mlp_adapter /home/wayneyjin/base_sig/checkpoints/cambrian-8b-pretrain-all/mm_projector.pth \
+    --pretrain_mm_mlp_adapter /home/wayneyjin/ckpt/mm_projector.pth \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
     --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
