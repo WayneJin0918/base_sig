@@ -9,7 +9,7 @@ export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /home/wayneyjin/ckpt/cambrian-8b-finetune-llm-base/tmp-checkpoint-1000\
+    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
@@ -36,8 +36,8 @@ python cambrian/train/train_tpu.py \
     --bf16 False \
     --output_dir $CKPT_DIR \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 32 \
-    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
