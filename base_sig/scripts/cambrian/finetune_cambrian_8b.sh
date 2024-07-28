@@ -7,6 +7,15 @@ export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &
 
 export CKPT_DIR="~/ckpt/$CKPT_NAME" &&
 
+# debug flags
+if [ "$LLAVA_DEBUG" = "1" ]; then
+    echo  "Use debug setups."
+    export TPU_PROCESS_BOUNDS=1,1,1
+    export TPU_VISIBLE_CHIPS=0
+    num_workers=0
+    export WANDB_MODE=disabled
+fi
+
 exp_name=cambrian_reproduce
 
 export WANDB_API_KEY="2bfd61b1549a21d11093d9fd3f83063b390034e2"
@@ -59,7 +68,7 @@ python cambrian/train/train_tpu.py \
     --tf32 False \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers ${num_workers:-4} \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
