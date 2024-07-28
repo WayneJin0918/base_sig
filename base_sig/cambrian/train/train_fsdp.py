@@ -983,6 +983,7 @@ class LazySupervisedDataset(Dataset):
             try:
                 image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
             except:
+                print(image_folder, image_file)
                 return self.__getitem__(0)
             image_size = image.size
             def expand2square(pil_img, background_color):
