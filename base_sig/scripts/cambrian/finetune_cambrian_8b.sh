@@ -5,15 +5,23 @@ export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-finetune-llm-base" &&
 export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
 
-export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
+export CKPT_DIR="~/ckpt/$CKPT_NAME" &&
 
+exp_name=cambrian_reproduce
+
+export WANDB_API_KEY="2bfd61b1549a21d11093d9fd3f83063b390034e2"
+export WANDB_ENTITY=nyu-visionx
+export WANDB_DISABLE_CODE="true"
+export WANDB_IGNORE_GLOBS="*.patch"
+export WANDB_PROJECT=Cambrian-DPO
+export WANDB_NAME=$exp_name
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path ~/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
-    --data_path /home/wayneyjin/Cambrian7M_withsystemprompt.jsonl \
-    --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
-    --pretrain_mm_mlp_adapter /home/wayneyjin/ckpt/mm_projector.pth \
+    --data_path ~/Cambrian7M_withsystemprompt.jsonl \
+    --image_folder /mnt/disks/storage/data/finetune_data/ \
+    --pretrain_mm_mlp_adapter ~/mm_projector.pth \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
     --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
@@ -59,12 +67,12 @@ python cambrian/train/train_tpu.py \
     --fsdp_config fsdp_config.json
 
 
-CKPT_PATH=/home/wayneyjin/ckpt/$CKPT_NAME
-# check if the checkpoint path exists
-if [ ! -d "$CKPT_PATH" ]; then
-    echo "Checkpoint path does not exist. Exiting..."
-    exit 1
-fi
-echo "Training finished. Syncing checkpoints to GCS..."
-gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
-echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
+# CKPT_PATH=~/ckpt/$CKPT_NAME
+# # check if the checkpoint path exists
+# if [ ! -d "$CKPT_PATH" ]; then
+#     echo "Checkpoint path does not exist. Exiting..."
+#     exit 1
+# fi
+# echo "Training finished. Syncing checkpoints to GCS..."
+# gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
+# echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
