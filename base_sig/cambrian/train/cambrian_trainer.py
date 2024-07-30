@@ -127,11 +127,13 @@ def get_length_grouped_indices(lengths, batch_size, world_size, generator=None, 
 
     return [i for megabatch in megabatches for batch in megabatch for i in batch]
 
+
 class LengthGroupedSampler(Sampler):
-    """
+    r"""
     Sampler that samples indices in a way that groups together features of the dataset of roughly the same length while
     keeping a bit of randomness.
     """
+
     def __init__(
         self,
         batch_size: int,
@@ -154,49 +156,10 @@ class LengthGroupedSampler(Sampler):
 
     def __iter__(self):
         if self.group_by_modality:
-            indices = self.get_fixed_length_modality_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
+            indices = get_modality_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
         else:
-            indices = self.get_fixed_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
+            indices = get_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
         return iter(indices)
-
-    def get_fixed_length_modality_grouped_indices(self, lengths, batch_size, world_size, generator=None):
-        assert all(l != 0 for l in lengths), "Should not have zero length."
-        if all(l > 0 for l in lengths) or all(l < 0 for l in lengths):
-            return self.get_fixed_length_grouped_indices(lengths, batch_size, world_size, generator=generator)
-        mm_indices, mm_lengths = zip(*[(i, l) for i, l in enumerate(lengths) if l > 0])
-        lang_indices, lang_lengths = zip(*[(i, -l) for i, l in enumerate(lengths) if l < 0])
-
-        mm_shuffle = [mm_indices[i] for i in self.get_fixed_length_grouped_indices(mm_lengths, batch_size, world_size, generator=None)]
-        lang_shuffle = [lang_indices[i] for i in self.get_fixed_length_grouped_indices(lang_lengths, batch_size, world_size, generator=None)]
-        megabatch_size = world_size * batch_size
-        mm_megabatches = [mm_shuffle[i : i + megabatch_size] for i in range(0, len(mm_shuffle), megabatch_size)]
-        lang_megabatches = [lang_shuffle[i : i + megabatch_size] for i in range(0, len(lang_shuffle), megabatch_size)]
-
-        last_mm = mm_megabatches[-1]
-        last_lang = lang_megabatches[-1]
-        additional_batch = last_mm + last_lang
-        megabatches = mm_megabatches[:-1] + lang_megabatches[:-1]
-        megabatch_indices = torch.randperm(len(megabatches), generator=generator)
-        megabatches = [megabatches[i] for i in megabatch_indices]
-
-        if len(additional_batch) > 0:
-            megabatches.append(sorted(additional_batch))
-
-        return [i for megabatch in megabatches for i in megabatch]
-
-    def get_fixed_length_grouped_indices(self, lengths, batch_size, world_size, generator=None):
-        indices = torch.randperm(len(lengths), generator=generator)
-        megabatch_size = world_size * batch_size
-        megabatches = [indices[i : i + megabatch_size].tolist() for i in range(0, len(lengths), megabatch_size)]
-        megabatches = [self.pad_and_sort_batch(megabatch, lengths) for megabatch in megabatches]
-
-        return [i for megabatch in megabatches for batch in megabatch for i in batch]
-
-    def pad_and_sort_batch(self, batch, lengths):
-        max_length = max(lengths[i] for i in batch)
-        padded_batch = [(i, lengths[i]) for i in batch]
-        padded_batch.sort(key=lambda x: x[1], reverse=True)
-        return padded_batch
 
 
 def _fetch_gradients(optimizer, param_to_name, selected_module_names):
@@ -237,7 +200,6 @@ def map_params_to_module_names(model_list):
 
 class CambrianTrainer(Trainer):
 
-
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
@@ -256,13 +218,6 @@ class CambrianTrainer(Trainer):
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
         inputs = self._prepare_inputs(inputs)
-        import numpy as np
-        # print(inputs)
-        # # 打印输入的形状
-        # for k, v in inputs.items():
-        #     if isinstance(v, list):
-        #         v = np.array(v)  # 将 list 转换为 numpy 数组
-        #     print(f"{k} shape: {v.shape}")
 
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
@@ -549,25 +504,94 @@ class CambrianTrainer(Trainer):
         self.model.load_state_dict(state_dict)
 
     def _save_checkpoint(self, model, trial, metrics=None):
-        if getattr(self.args, 'tune_mm_mlp_adapter', False):
-            from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
-            checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+        from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
-            run_dir = self._get_output_dir(trial=trial)
-            output_dir = os.path.join(run_dir, checkpoint_folder)
+        # Names of files
+        TRAINING_ARGS_NAME = "training_args.bin"
+        WEIGHTS_NAME = "pytorch_model.bin"
+        SCHEDULER_NAME = "scheduler.pt"
+        TRAINER_STATE_NAME = "trainer_state.json"
 
-            # Only save Adapter
-            keys_to_match = ['mm_projector', 'vision_resampler']
-            if getattr(self.args, "use_im_start_end", False):
-                keys_to_match.extend(['embed_tokens', 'embed_in'])
+        checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+        run_dir = self._get_output_dir(trial=trial)
+        output_dir = os.path.join(run_dir, checkpoint_folder)
+        logger.info(f"Saving model checkpoint to {output_dir}")
 
-            weight_to_save = get_mm_adapter_state_maybe_zero_3(self.model.named_parameters(), keys_to_match)
+        model = self.model
+        import torch_xla.core.xla_model as xm
+        rank = xm.get_ordinal()
+        world_size = xm.xrt_world_size()
 
-            if self.args.local_rank == 0 or self.args.local_rank == -1:
-                self.model.config.save_pretrained(output_dir)
-                torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
-        else:
-            super(CambrianTrainer, self)._save_checkpoint(model, trial, metrics)
+        # Name of files to save
+        SHARD_NAME = f'weights_rank-{rank:08d}-of-{world_size:08d}-{WEIGHTS_NAME}'
+        SHARD_NAME_OPT = f'opt_rank-{rank:08d}-of-{world_size:08d}-{WEIGHTS_NAME}'
+        RNG_NAME = f'rng_rank-{rank:08d}-of-{world_size:08d}-rng.pth'
+
+        # Path of files to save
+        SHARD_NAME_PATH = os.path.join(output_dir, SHARD_NAME)
+        SHARD_NAME_OPT_PATH = os.path.join(output_dir, SHARD_NAME_OPT)
+        LR_PATH = os.path.join(output_dir, SCHEDULER_NAME)
+        TRAIN_ARGS_PATH = os.path.join(output_dir, TRAINING_ARGS_NAME)
+        TRAINER_STATE_NAME_PATH = os.path.join(output_dir, TRAINER_STATE_NAME)
+        RNG_PATH = os.path.join(output_dir, RNG_NAME)
+        lr_scheduler_state_dict = self.lr_scheduler.state_dict()
+
+        # Final form of model and opt
+        ckpt = {
+            'model': self.model.state_dict(),
+            'shard_metadata': self.model.get_shard_metadata()
+        }
+        opt_ckpt = {
+            'optimizer_state' : self.optimizer.state_dict(),
+            'shard_metadata': self.model.get_shard_metadata()
+        }
+
+        # Saving model shards
+        with fs.open(SHARD_NAME_PATH, 'wb') as f:
+            xm.save(ckpt, f, master_only=False)
+
+        # Saving optimizer shards
+        with fs.open(SHARD_NAME_OPT_PATH, 'wb') as f:
+            xm.save(opt_ckpt, f, master_only=False)
+
+        # saving lr scheduler and train state json
+        if xm.is_master_ordinal(local=False):
+            with fs.open(LR_PATH, 'wb') as f:
+                xm.save(lr_scheduler_state_dict, f, master_only=True)
+
+            json_string = json.dumps(dataclasses.asdict(self.state), indent=2, sort_keys=True) + "\n"
+            with fs.open(TRAINER_STATE_NAME_PATH, 'w') as f:
+                f.write(json_string)
+
+        rng_states = {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "cpu": torch.random.get_rng_state(),
+        }
+        rng_states["xla"] = xm.get_rng_state()
+        with fs.open(RNG_PATH, 'wb') as f:
+            torch.save(rng_states, f)
+
+    # def _save_checkpoint(self, model, trial, metrics=None):
+    #     if getattr(self.args, 'tune_mm_mlp_adapter', False):
+    #         from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
+    #         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+
+    #         run_dir = self._get_output_dir(trial=trial)
+    #         output_dir = os.path.join(run_dir, checkpoint_folder)
+
+    #         # Only save Adapter
+    #         keys_to_match = ['mm_projector', 'vision_resampler']
+    #         if getattr(self.args, "use_im_start_end", False):
+    #             keys_to_match.extend(['embed_tokens', 'embed_in'])
+
+    #         weight_to_save = get_mm_adapter_state_maybe_zero_3(self.model.named_parameters(), keys_to_match)
+
+    #         if self.args.local_rank == 0 or self.args.local_rank == -1:
+    #             self.model.config.save_pretrained(output_dir)
+    #             torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
+    #     else:
+    #         super(CambrianTrainer, self)._save_checkpoint(model, trial, metrics)
 
     def get_train_dataloader(self) -> DataLoader:
         out = super().get_train_dataloader()
@@ -602,9 +626,9 @@ class CambrianTrainer(Trainer):
         xm.save(ckpt, ckpt_path, master_only=False)
         print(f'checkpoint saved to {ckpt_path}\n', end='')
         if xm.is_master_ordinal(local=False):
-            consolidate_sharded_model_checkpoints(
-                ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
-            self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
+            # consolidate_sharded_model_checkpoints(
+            #     ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
+            # self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
             TRAINING_ARGS_NAME = "training_args.bin"
