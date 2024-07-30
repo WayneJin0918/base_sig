@@ -964,7 +964,7 @@ class LazySupervisedDataset(Dataset):
         return "image" in sample and not str(sample['image']) in ['', 'None', 'none', 'nan']
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        i = 0 # use exactly the same data to debug
+        # i = 0 # use exactly the same data to debug
         #sources = self.list_data_dict[i]
 
         with open(self.data_path, 'r') as file:
