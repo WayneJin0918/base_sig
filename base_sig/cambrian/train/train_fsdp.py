@@ -1604,7 +1604,6 @@ def train(INDEX, attn_implementation=None):
         model = get_peft_model(model, lora_config)
 
     log_rank0("Configuring tokenizer...")
-    import pdb; pdb.set_trace()
     if 'mpt' in model_args.model_name_or_path:
         tokenizer = transformers.AutoTokenizer.from_pretrained(
             model_args.model_name_or_path,
