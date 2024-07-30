@@ -1,11 +1,11 @@
 
-export PJRT_DEVICE=TPU &&
+export PJRT_DEVICE=TPU
 # export XLA_USE_BF16=0 &&
-export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base" &&
-export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
+# export WANDB_RESUME="allow" &&
+export CKPT_NAME="cambrian-8b-finetune-llm-base"
+# export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
-export CKPT_DIR="~/ckpt/$CKPT_NAME" &&
+export CKPT_DIR="~/ckpt/$CKPT_NAME"
 
 # debug flags
 if [ "$LLAVA_DEBUG" = "1" ]; then
