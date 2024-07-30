@@ -3,6 +3,11 @@ from cambrian.train.train_fsdp import train
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+import wandb
+import os
+
+if os.getenv('WANDB_API_KEY', None) is not None:
+    wandb.login(key=os.getenv('WANDB_API_KEY'))
 
 if __name__ == "__main__":
     #train()
