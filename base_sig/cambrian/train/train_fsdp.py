@@ -454,15 +454,15 @@ def preprocess_llama_3(
             # User Prompt
             elif i % 2 == 1:
                 if i==1 and has_image:
-                    round_len = len(tokenizer_image_token_llama3(rou, tokenizer)) - 1 # ignore the first token
+                    round_len = len(tokenizer_image_token_llama3(rou, tokenizer)) # - 1 # ignore the first token
                 else:
-                    round_len = len(tokenizer(rou).input_ids) - 1
+                    round_len = len(tokenizer(rou).input_ids) # - 1
                 # Don't predict system prompt
                 target[cur_len : cur_len + round_len] = IGNORE_INDEX
                 cur_len += round_len
             # Model Reponse
             elif i % 2 == 0:
-                round_len = len(tokenizer(rou).input_ids) - 1
+                round_len = len(tokenizer(rou).input_ids) # - 1
                 # Don't predict system prompt
                 target[cur_len : cur_len + 3] = IGNORE_INDEX
                 cur_len += round_len
@@ -1604,6 +1604,7 @@ def train(INDEX, attn_implementation=None):
         model = get_peft_model(model, lora_config)
 
     log_rank0("Configuring tokenizer...")
+    import pdb; pdb.set_trace()
     if 'mpt' in model_args.model_name_or_path:
         tokenizer = transformers.AutoTokenizer.from_pretrained(
             model_args.model_name_or_path,

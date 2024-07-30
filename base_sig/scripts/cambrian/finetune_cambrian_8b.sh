@@ -26,7 +26,7 @@ export WANDB_PROJECT=Cambrian-DPO
 export WANDB_NAME=$exp_name
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path ~/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
     --data_path ~/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data/ \
