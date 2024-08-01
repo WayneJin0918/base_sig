@@ -53,6 +53,7 @@ from ezcolorlog import root_logger as logger
 
 from packaging import version
 
+from cambrian.train.gcloud_rsync_callback import GCloudRsyncCallback
 
 logger.setLevel(logging.WARNING)
 
@@ -1751,11 +1752,15 @@ def train(INDEX, attn_implementation=None):
     #     # rm wandb from training_args.report_to so it doesn't get passed to the Trainer
     #     training_args.report_to.remove("wandb")
     #     assert "wandb" not in training_args.report_to, training_args.report_to
+    
+    gcloud_callback = GCloudRsyncCallback(training_args.output_dir, training_args.gcs_output_dir, training_args.gcp_project)
+    callbacks.append(gcloud_callback)
 
     log_rank0("Configuring trainer...")
     trainer = CambrianTrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
+                    callbacks=callbacks,
                     **data_module)
     trainer.is_fsdp_enabled = True
     if training_args.train_continue:
