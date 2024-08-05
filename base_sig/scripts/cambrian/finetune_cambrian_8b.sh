@@ -35,13 +35,13 @@ python cambrian/train/train_tpu.py \
     --group_by_modality_length True \
     --bf16 False \
     --output_dir $CKPT_DIR \
-    --num_train_epochs 1 \
+    --num_train_epochs 0.01 \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 7000 \
+    --save_steps 17000 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
