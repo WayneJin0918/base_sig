@@ -406,7 +406,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('shusheng')
         blob = bucket.blob(RNG_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
@@ -442,7 +442,7 @@ class CambrianTrainer(Trainer):
 
         # connect to gcloud bucket
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('shusheng')
 
         # Loading opt state to each device
         blob = bucket.blob(SHARD_NAME_PATH)
@@ -491,7 +491,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('shusheng')
         blob = bucket.blob(SHARD_NAME_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
