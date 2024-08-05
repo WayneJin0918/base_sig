@@ -73,7 +73,9 @@ python cambrian/train/train_tpu.py \
     --report_to wandb \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json
+    --fsdp_config fsdp_config.json \
+    --train_continue True \
+    --resume_from_checkpoint /home/shusheng/checkpoints/ImpLangSup/cambrian-8b-finetune-llm-base/checkpoint-11000
 
 
 # CKPT_PATH=~/ckpt/$CKPT_NAME
