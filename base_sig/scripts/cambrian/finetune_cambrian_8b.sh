@@ -25,6 +25,8 @@ export WANDB_IGNORE_GLOBS="*.patch"
 export WANDB_PROJECT=Cambrian-DPO
 export WANDB_NAME=$exp_name
 
+export WANDB_MODE="disabled"
+
 python cambrian/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
