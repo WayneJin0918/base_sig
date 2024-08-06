@@ -25,7 +25,7 @@ export WANDB_IGNORE_GLOBS="*.patch"
 export WANDB_PROJECT=Cambrian-DPO
 export WANDB_NAME=$exp_name
 
-export WANDB_MODE="disabled"
+# export WANDB_MODE="disabled"
 
 python cambrian/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
@@ -77,7 +77,7 @@ python cambrian/train/train_tpu.py \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json \
     --train_continue True \
-    --resume_from_checkpoint /home/shusheng/checkpoints/ImpLangSup/cambrian-8b-finetune-llm-base/checkpoint-11000
+    --resume_from_checkpoint /home/shusheng/checkpoints/ImpLangSup/cambrian-8b-finetune-llm-base/checkpoint-12500
 
 
 # CKPT_PATH=~/ckpt/$CKPT_NAME
