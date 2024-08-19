@@ -127,6 +127,7 @@ def get_length_grouped_indices(lengths, batch_size, world_size, generator=None, 
 
     return [i for megabatch in megabatches for batch in megabatch for i in batch]
 
+
 class LengthGroupedSampler(Sampler):
     """
     Sampler that samples indices in a way that groups together features of the dataset of roughly the same length while
@@ -234,9 +235,126 @@ def map_params_to_module_names(model_list):
                 param_to_name[param] = f"{module_name}.{param_name}"
     return param_to_name
 
+import torch
+import torch.nn.functional as F
 
 class CambrianTrainer(Trainer):
+        
+    def get_batch_logps(self, logits: torch.FloatTensor, labels: torch.LongTensor, return_per_token_logp=False, return_all=False) -> torch.FloatTensor:
+        """Compute the log probabilities of the given labels under the given logits.
 
+        Args:
+            logits: Logits of the model (unnormalized). Shape: (batch_size, sequence_length, vocab_size)
+            labels: Labels for which to compute the log probabilities. Label tokens with a value of -100 are ignored. Shape: (batch_size, sequence_length)
+        Returns:
+            A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
+        """
+        assert logits.shape[:-1] == labels.shape
+
+        # labels = labels[:, 1:].clone()
+        labels = labels.clone()
+        # logits = logits[:, :-1, :]
+        loss_mask1 = (labels != -100)
+        loss_mask2 = (labels != -200)
+        loss_mask = loss_mask1 * loss_mask2
+        # dummy token; we'll ignore the losses on these tokens later
+        labels[labels == -100] = 0
+        labels[labels == -200] = 0
+
+        # Adding a small constant to logits for numerical stability
+        logits = logits + 1e-9
+
+        per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
+
+        log_prob = (per_token_logps * loss_mask).sum(-1)
+        # loss_mask_sum = loss_mask.sum(-1)
+        
+        # To avoid division by zero, we use torch.where to conditionally divide
+
+        return log_prob
+
+    def simpo_loss(self, policy_chosen_logps: torch.FloatTensor,
+                   policy_rejected_logps: torch.FloatTensor,
+                #    lengths_chosen: torch.FloatTensor,
+                #    lengths_rejected: torch.FloatTensor,
+                   beta: float,
+                   gamma: float) -> torch.FloatTensor:
+        """Compute the SimPO loss for a batch of policy log probabilities and sequence lengths.
+
+        Args:
+            policy_chosen_logps: Log probabilities of the policy model for the chosen responses. Shape: (batch_size,)
+            policy_rejected_logps: Log probabilities of the policy model for the rejected responses. Shape: (batch_size,)
+            lengths_chosen: Lengths of the chosen responses. Shape: (batch_size,)
+            lengths_rejected: Lengths of the rejected responses. Shape: (batch_size,)
+            beta: Scaling parameter for the SimPO loss.
+            gamma: Margin parameter for the SimPO loss.
+
+        Returns:
+            A tensor containing the SimPO loss for each example in the batch.
+        """
+        # normalized_chosen_logps = policy_chosen_logps / lengths_chosen
+        # normalized_rejected_logps = policy_rejected_logps / lengths_rejected
+        normalized_chosen_logps = policy_chosen_logps
+        normalized_rejected_logps = policy_rejected_logps
+        # if torch.isnan(normalized_chosen_logps).any():
+        #     print(policy_chosen_logps)
+        # if torch.isnan(normalized_rejected_logps).any():
+        #     print(policy_rejected_logps)
+        logits = beta * (normalized_chosen_logps - normalized_rejected_logps) - gamma
+        losses = -F.logsigmoid(logits)
+        
+        return losses
+
+    def compute_loss(self, log_prob, return_outputs=False):
+        # outputs = model(**inputs)
+        # # noise_levels = inputs['noise_levels']
+        # logits = outputs.logits
+        # labels = inputs['labels']
+
+        log_prob = log_prob
+    
+        group_size = 2
+        batch_size = log_prob.size(0)
+        num_groups = batch_size // group_size
+    
+            # if batch_size % group_size != 0:
+            #     raise ValueError("Batch size must be divisible by the group size")
+        # lengths = (log_prob != 0)
+        # lengths = lengths.sum(dim=-1).float().view(num_groups, group_size)
+        log_prob = log_prob.view(num_groups, group_size)
+        #     # average_log_prob = average_log_prob.view(num_groups, group_size)
+        # lengths1=(labels != -100 )
+        # lengths2=(labels != -200 )
+        # lengths = (lengths1*lengths2).sum(dim=-1).float().view(num_groups, group_size)
+        # print(log_prob)
+        best_log_prob = log_prob[:, 0]
+        worst_log_prob = log_prob[:, 1]
+        # best_length = lengths[:, 0]
+        # worst_length = lengths[:, 1]
+    
+        losses = self.simpo_loss(
+                best_log_prob,
+                worst_log_prob,
+                # best_length,
+                # worst_length,
+                beta=1.5,
+                gamma=0.5
+            )
+    
+        total_simpo_loss = losses.mean()
+        total_loss = total_simpo_loss
+        
+        # print(total_loss)
+        # else:
+        #     total_loss = outputs.loss
+        #     print(total_loss,"2")
+        # if torch.isnan(total_loss):
+        #     total_loss = outputs.loss
+        #     print(total_loss)
+    
+        # assert total_loss > 0
+        return total_loss
+        # return outputs.loss
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
@@ -256,21 +374,20 @@ class CambrianTrainer(Trainer):
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
         inputs = self._prepare_inputs(inputs)
-        import numpy as np
-        # print(inputs)
-        # # 打印输入的形状
-        # for k, v in inputs.items():
-        #     if isinstance(v, list):
-        #         v = np.array(v)  # 将 list 转换为 numpy 数组
-        #     print(f"{k} shape: {v.shape}")
 
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
             return loss_mb.reduce_mean().detach().to(self.args.device)
 
         with self.compute_loss_context_manager():
-            loss = self.compute_loss(model, inputs)
+            outputs = model(**inputs)
+            logits = outputs.logits
+            labels = inputs['input_ids']
 
+            log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+            loss = self.compute_loss(log_prob)
+            loss = outputs.loss
+            loss = 0.5*loss + 0.5*outputs.loss
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
@@ -451,7 +568,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('my-tpu-bucket-weiyang')
         blob = bucket.blob(RNG_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
@@ -487,7 +604,7 @@ class CambrianTrainer(Trainer):
 
         # connect to gcloud bucket
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('my-tpu-bucket-weiyang')
 
         # Loading opt state to each device
         blob = bucket.blob(SHARD_NAME_PATH)
@@ -536,7 +653,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('my-tpu-bucket-weiyang')
         blob = bucket.blob(SHARD_NAME_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
@@ -549,25 +666,94 @@ class CambrianTrainer(Trainer):
         self.model.load_state_dict(state_dict)
 
     def _save_checkpoint(self, model, trial, metrics=None):
-        if getattr(self.args, 'tune_mm_mlp_adapter', False):
-            from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
-            checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+        from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
-            run_dir = self._get_output_dir(trial=trial)
-            output_dir = os.path.join(run_dir, checkpoint_folder)
+        # Names of files
+        TRAINING_ARGS_NAME = "training_args.bin"
+        WEIGHTS_NAME = "pytorch_model.bin"
+        SCHEDULER_NAME = "scheduler.pt"
+        TRAINER_STATE_NAME = "trainer_state.json"
 
-            # Only save Adapter
-            keys_to_match = ['mm_projector', 'vision_resampler']
-            if getattr(self.args, "use_im_start_end", False):
-                keys_to_match.extend(['embed_tokens', 'embed_in'])
+        checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+        run_dir = self._get_output_dir(trial=trial)
+        output_dir = os.path.join(run_dir, checkpoint_folder)
+        logger.info(f"Saving model checkpoint to {output_dir}")
 
-            weight_to_save = get_mm_adapter_state_maybe_zero_3(self.model.named_parameters(), keys_to_match)
+        model = self.model
+        import torch_xla.core.xla_model as xm
+        rank = xm.get_ordinal()
+        world_size = xm.xrt_world_size()
 
-            if self.args.local_rank == 0 or self.args.local_rank == -1:
-                self.model.config.save_pretrained(output_dir)
-                torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
-        else:
-            super(CambrianTrainer, self)._save_checkpoint(model, trial, metrics)
+        # Name of files to save
+        SHARD_NAME = f'weights_rank-{rank:08d}-of-{world_size:08d}-{WEIGHTS_NAME}'
+        SHARD_NAME_OPT = f'opt_rank-{rank:08d}-of-{world_size:08d}-{WEIGHTS_NAME}'
+        RNG_NAME = f'rng_rank-{rank:08d}-of-{world_size:08d}-rng.pth'
+
+        # Path of files to save
+        SHARD_NAME_PATH = os.path.join(output_dir, SHARD_NAME)
+        SHARD_NAME_OPT_PATH = os.path.join(output_dir, SHARD_NAME_OPT)
+        LR_PATH = os.path.join(output_dir, SCHEDULER_NAME)
+        TRAIN_ARGS_PATH = os.path.join(output_dir, TRAINING_ARGS_NAME)
+        TRAINER_STATE_NAME_PATH = os.path.join(output_dir, TRAINER_STATE_NAME)
+        RNG_PATH = os.path.join(output_dir, RNG_NAME)
+        lr_scheduler_state_dict = self.lr_scheduler.state_dict()
+
+        # Final form of model and opt
+        ckpt = {
+            'model': self.model.state_dict(),
+            'shard_metadata': self.model.get_shard_metadata()
+        }
+        opt_ckpt = {
+            'optimizer_state' : self.optimizer.state_dict(),
+            'shard_metadata': self.model.get_shard_metadata()
+        }
+
+        # Saving model shards
+        with fs.open(SHARD_NAME_PATH, 'wb') as f:
+            xm.save(ckpt, f, master_only=False)
+
+        # Saving optimizer shards
+        with fs.open(SHARD_NAME_OPT_PATH, 'wb') as f:
+            xm.save(opt_ckpt, f, master_only=False)
+
+        # saving lr scheduler and train state json
+        if xm.is_master_ordinal(local=False):
+            with fs.open(LR_PATH, 'wb') as f:
+                xm.save(lr_scheduler_state_dict, f, master_only=True)
+
+            json_string = json.dumps(dataclasses.asdict(self.state), indent=2, sort_keys=True) + "\n"
+            with fs.open(TRAINER_STATE_NAME_PATH, 'w') as f:
+                f.write(json_string)
+
+        rng_states = {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "cpu": torch.random.get_rng_state(),
+        }
+        rng_states["xla"] = xm.get_rng_state()
+        with fs.open(RNG_PATH, 'wb') as f:
+            torch.save(rng_states, f)
+
+    # def _save_checkpoint(self, model, trial, metrics=None):
+    #     if getattr(self.args, 'tune_mm_mlp_adapter', False):
+    #         from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
+    #         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+
+    #         run_dir = self._get_output_dir(trial=trial)
+    #         output_dir = os.path.join(run_dir, checkpoint_folder)
+
+    #         # Only save Adapter
+    #         keys_to_match = ['mm_projector', 'vision_resampler']
+    #         if getattr(self.args, "use_im_start_end", False):
+    #             keys_to_match.extend(['embed_tokens', 'embed_in'])
+
+    #         weight_to_save = get_mm_adapter_state_maybe_zero_3(self.model.named_parameters(), keys_to_match)
+
+    #         if self.args.local_rank == 0 or self.args.local_rank == -1:
+    #             self.model.config.save_pretrained(output_dir)
+    #             torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
+    #     else:
+    #         super(CambrianTrainer, self)._save_checkpoint(model, trial, metrics)
 
     def get_train_dataloader(self) -> DataLoader:
         out = super().get_train_dataloader()
@@ -602,9 +788,9 @@ class CambrianTrainer(Trainer):
         xm.save(ckpt, ckpt_path, master_only=False)
         print(f'checkpoint saved to {ckpt_path}\n', end='')
         if xm.is_master_ordinal(local=False):
-            consolidate_sharded_model_checkpoints(
-                ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
-            self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
+            # consolidate_sharded_model_checkpoints(
+            #     ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
+            # self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
             TRAINING_ARGS_NAME = "training_args.bin"
@@ -632,8 +818,8 @@ class CambrianTrainer(Trainer):
             logs["learning_rate"] = self._get_learning_rate()
 
             # Add custom logs
-            if self.args.unfreeze_mm_vision_tower:
-                logs["mm_vision_tower_lr"] = self.optimizer.param_groups[2]['lr']
+            # if self.args.unfreeze_mm_vision_tower:
+            #     logs["mm_vision_tower_lr"] = self.optimizer.param_groups[2]['lr']
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
