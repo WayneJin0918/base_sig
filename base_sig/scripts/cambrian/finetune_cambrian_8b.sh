@@ -2,16 +2,16 @@
 export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-0.01" &&
+export CKPT_NAME="cambrian-8b-finetune-llm-base-2-stage-mix-loss" &&
 export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
 
-export CKPT_DIR="/home/wayneyjin/ckpt/$CKPT_NAME" &&
+export CKPT_DIR=" gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
     --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
     --version llama_v3 \
-    --data_path /home/wayneyjin/Cambrian7M_withsystemprompt.jsonl \
+    --data_path /home/wayneyjin/ckpt/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
     --pretrain_mm_mlp_adapter /home/wayneyjin/ckpt/mm_projector.pth \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
@@ -27,7 +27,7 @@ python cambrian/train/train_tpu.py \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
-    --unfreeze_mm_vision_tower False \
+    --unfreeze_mm_vision_tower True \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
