@@ -568,7 +568,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('my-tpu-bucket-weiyang')
+        bucket = client.get_bucket('us-central2-storage')
         blob = bucket.blob(RNG_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
@@ -604,7 +604,7 @@ class CambrianTrainer(Trainer):
 
         # connect to gcloud bucket
         client = storage.Client()
-        bucket = client.get_bucket('my-tpu-bucket-weiyang')
+        bucket = client.get_bucket('us-central2-storage')
 
         # Loading opt state to each device
         blob = bucket.blob(SHARD_NAME_PATH)
@@ -653,7 +653,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('my-tpu-bucket-weiyang')
+        bucket = client.get_bucket('us-central2-storage')
         blob = bucket.blob(SHARD_NAME_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
@@ -818,8 +818,8 @@ class CambrianTrainer(Trainer):
             logs["learning_rate"] = self._get_learning_rate()
 
             # Add custom logs
-            # if self.args.unfreeze_mm_vision_tower:
-            #     logs["mm_vision_tower_lr"] = self.optimizer.param_groups[2]['lr']
+            if self.args.unfreeze_mm_vision_tower:
+                logs["mm_vision_tower_lr"] = self.optimizer.param_groups[2]['lr']
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
