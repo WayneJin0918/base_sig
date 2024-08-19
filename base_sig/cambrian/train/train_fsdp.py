@@ -1668,7 +1668,7 @@ import os
 import torch 
 
 def train(INDEX, attn_implementation=None):
-    import torch as torch
+
     global local_rank
     
     log_rank0(f"Training on index {INDEX}. Local rank: {local_rank}")
@@ -1678,7 +1678,7 @@ def train(INDEX, attn_implementation=None):
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-    compute_dtype = None
+
     # verify that the train_batch_size is set correctly
     if training_args.batch_size is not None:
         if IS_XLA_AVAILABLE:
@@ -1699,7 +1699,6 @@ def train(INDEX, attn_implementation=None):
     def forward(self, hidden_states):
         input_dtype = hidden_states.dtype
         hidden_states = hidden_states.to(torch.float32)
-        # hidden_states = hidden_states.float()
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         output = (self.weight * hidden_states).to(input_dtype)
@@ -1823,12 +1822,8 @@ def train(INDEX, attn_implementation=None):
     model.config.use_cache = False
     model.generation_config.do_sample = True
 
-    log_rank0("Freezing all LLM parameters...")
-
     if model_args.freeze_backbone:
-        model.model.requires_grad_(True)
-
-    log_rank0("All LLM parameters are frozen.")
+        model.model.requires_grad_(False)
 
     log_rank0("Model loaded.")
 
@@ -1961,13 +1956,8 @@ def train(INDEX, attn_implementation=None):
 
         model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
         if training_args.freeze_mm_mlp_adapter:
-            # for p in model.get_model().mm_projector.parameters():
-            #     p.requires_grad = False
-            tune_modules = ['mm_projector']
-            for name, param in model.named_parameters():
-                if any(listed_name in name for listed_name in tune_modules):
-                    print_rank0('tuning {}'.format(name))
-                    param.requires_grad = False
+            for p in model.get_model().mm_projector.parameters():
+                p.requires_grad = False
         if training_args.unfreeze_mm_vision_tower:
             if vision_tower_aux_list is not None:
                 for vision_tower_aux in vision_tower_aux_list:
@@ -2004,9 +1994,8 @@ def train(INDEX, attn_implementation=None):
                         module = module.to(torch.bfloat16)
 
     log_rank0("Configuring data module...")
-    noise_level=[0,30,50]
     data_module = make_supervised_data_module(tokenizer=tokenizer,
-                                              data_args=data_args, noise_level=noise_level)
+                                              data_args=data_args)
 
     
 
@@ -2041,51 +2030,7 @@ def train(INDEX, attn_implementation=None):
 
     model.config.use_cache = True
 
-
-    import os
-    import torch
-
-    def save_siglip_vision_tower(model, output_dir):
-        """
-        Extract and save the SiglipVisionTower from the model.
-        
-        :param model: The model containing the SiglipVisionTower
-        :param output_dir: The directory where the SiglipVisionTower will be saved
-        """
-        # Ensure the output directory exists
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        # Extract the vision tower from the model (assuming the model has a method to get it)
-        if hasattr(model, "get_vision_tower"):
-            vision_tower = model.get_vision_tower()
-            
-            # Save the vision tower's state dictionary
-            vision_tower_state_dict = vision_tower.state_dict()
-            vision_tower_path = os.path.join(output_dir, "siglip_vision_tower.bin")
-            torch.save(vision_tower_state_dict, vision_tower_path)
-            print(f"SiglipVisionTower state saved to {vision_tower_path}")
-            
-            # Optional: Save the processor state (if applicable)
-            if hasattr(vision_tower, 'image_processor'):
-                processor_state = vision_tower.image_processor.state_dict()  # Assuming ProcessorWrapper has a state_dict
-                processor_path = os.path.join(output_dir, "siglip_image_processor.bin")
-                torch.save(processor_state, processor_path)
-                print(f"SiglipVisionTower image processor saved to {processor_path}")
-        
-        else:
-            raise ValueError("The model does not contain a SiglipVisionTower")
-
-    # Call the save function after training or at the appropriate place in your code
-    log_rank0("Saving model and SiglipVisionTower...")
-
-    # Save the model normally, then save the SiglipVisionTower separately
-    output_dir = training_args.output_dir
-
-    # Save the SiglipVisionTower separately from the rest of the model
-    save_siglip_vision_tower(model, output_dir)
-
-    # Save the rest of the model
+    log_rank0("Saving model...")
     if training_args.lora_enable:
         state_dict = get_peft_state_maybe_zero_3(
             model.named_parameters(), training_args.lora_bias
@@ -2098,9 +2043,8 @@ def train(INDEX, attn_implementation=None):
             model.save_pretrained(training_args.output_dir, state_dict=state_dict)
             torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))
     else:
-        safe_save_model_for_hf_trainer(trainer=trainer, output_dir=training_args.output_dir)
-
-    log_rank0(f"Model and SiglipVisionTower saved to {output_dir}")
+        safe_save_model_for_hf_trainer(trainer=trainer,
+                                       output_dir=training_args.output_dir)
 
 
 if __name__ == "__main__":
