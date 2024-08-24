@@ -2,7 +2,7 @@
 export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-2-stage-mix-loss" &&
+export CKPT_NAME="cambrian-8b-finetune-llm-base-vision-on" &&
 export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
 
 export CKPT_DIR=" gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME" &&
@@ -41,7 +41,7 @@ python cambrian/train/train_tpu.py \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 17000 \
+    --save_steps 6900 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
@@ -51,7 +51,7 @@ python cambrian/train/train_tpu.py \
     --tf32 False \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 8 \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
