@@ -2,14 +2,14 @@
 export PJRT_DEVICE=TPU &&
 # export XLA_USE_BF16=0 &&
 export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-vision-on" &&
+export CKPT_NAME="cambrian-8b-finetune-llm-base-vision-on-2-epoch" &&
 export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1" &&
 
 export CKPT_DIR=" gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME" &&
 
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path /home/wayneyjin/ckpt/cambrian-sig-8b \
     --version llama_v3 \
     --data_path /home/wayneyjin/ckpt/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
