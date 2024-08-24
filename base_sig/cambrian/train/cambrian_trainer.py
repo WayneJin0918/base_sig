@@ -129,10 +129,11 @@ def get_length_grouped_indices(lengths, batch_size, world_size, generator=None, 
 
 
 class LengthGroupedSampler(Sampler):
-    """
+    r"""
     Sampler that samples indices in a way that groups together features of the dataset of roughly the same length while
     keeping a bit of randomness.
     """
+
     def __init__(
         self,
         batch_size: int,
@@ -155,49 +156,10 @@ class LengthGroupedSampler(Sampler):
 
     def __iter__(self):
         if self.group_by_modality:
-            indices = self.get_fixed_length_modality_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
+            indices = get_modality_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
         else:
-            indices = self.get_fixed_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
+            indices = get_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
         return iter(indices)
-
-    def get_fixed_length_modality_grouped_indices(self, lengths, batch_size, world_size, generator=None):
-        assert all(l != 0 for l in lengths), "Should not have zero length."
-        if all(l > 0 for l in lengths) or all(l < 0 for l in lengths):
-            return self.get_fixed_length_grouped_indices(lengths, batch_size, world_size, generator=generator)
-        mm_indices, mm_lengths = zip(*[(i, l) for i, l in enumerate(lengths) if l > 0])
-        lang_indices, lang_lengths = zip(*[(i, -l) for i, l in enumerate(lengths) if l < 0])
-
-        mm_shuffle = [mm_indices[i] for i in self.get_fixed_length_grouped_indices(mm_lengths, batch_size, world_size, generator=None)]
-        lang_shuffle = [lang_indices[i] for i in self.get_fixed_length_grouped_indices(lang_lengths, batch_size, world_size, generator=None)]
-        megabatch_size = world_size * batch_size
-        mm_megabatches = [mm_shuffle[i : i + megabatch_size] for i in range(0, len(mm_shuffle), megabatch_size)]
-        lang_megabatches = [lang_shuffle[i : i + megabatch_size] for i in range(0, len(lang_shuffle), megabatch_size)]
-
-        last_mm = mm_megabatches[-1]
-        last_lang = lang_megabatches[-1]
-        additional_batch = last_mm + last_lang
-        megabatches = mm_megabatches[:-1] + lang_megabatches[:-1]
-        megabatch_indices = torch.randperm(len(megabatches), generator=generator)
-        megabatches = [megabatches[i] for i in megabatch_indices]
-
-        if len(additional_batch) > 0:
-            megabatches.append(sorted(additional_batch))
-
-        return [i for megabatch in megabatches for i in megabatch]
-
-    def get_fixed_length_grouped_indices(self, lengths, batch_size, world_size, generator=None):
-        indices = torch.randperm(len(lengths), generator=generator)
-        megabatch_size = world_size * batch_size
-        megabatches = [indices[i : i + megabatch_size].tolist() for i in range(0, len(lengths), megabatch_size)]
-        megabatches = [self.pad_and_sort_batch(megabatch, lengths) for megabatch in megabatches]
-
-        return [i for megabatch in megabatches for batch in megabatch for i in batch]
-
-    def pad_and_sort_batch(self, batch, lengths):
-        max_length = max(lengths[i] for i in batch)
-        padded_batch = [(i, lengths[i]) for i in batch]
-        padded_batch.sort(key=lambda x: x[1], reverse=True)
-        return padded_batch
 
 
 def _fetch_gradients(optimizer, param_to_name, selected_module_names):
@@ -235,126 +197,8 @@ def map_params_to_module_names(model_list):
                 param_to_name[param] = f"{module_name}.{param_name}"
     return param_to_name
 
-import torch
-import torch.nn.functional as F
 
 class CambrianTrainer(Trainer):
-        
-    def get_batch_logps(self, logits: torch.FloatTensor, labels: torch.LongTensor, return_per_token_logp=False, return_all=False) -> torch.FloatTensor:
-        """Compute the log probabilities of the given labels under the given logits.
-
-        Args:
-            logits: Logits of the model (unnormalized). Shape: (batch_size, sequence_length, vocab_size)
-            labels: Labels for which to compute the log probabilities. Label tokens with a value of -100 are ignored. Shape: (batch_size, sequence_length)
-        Returns:
-            A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
-        """
-        assert logits.shape[:-1] == labels.shape
-
-        # labels = labels[:, 1:].clone()
-        labels = labels.clone()
-        # logits = logits[:, :-1, :]
-        loss_mask1 = (labels != -100)
-        loss_mask2 = (labels != -200)
-        loss_mask = loss_mask1 * loss_mask2
-        # dummy token; we'll ignore the losses on these tokens later
-        labels[labels == -100] = 0
-        labels[labels == -200] = 0
-
-        # Adding a small constant to logits for numerical stability
-        logits = logits + 1e-9
-
-        per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
-
-        log_prob = (per_token_logps * loss_mask).sum(-1)
-        # loss_mask_sum = loss_mask.sum(-1)
-        
-        # To avoid division by zero, we use torch.where to conditionally divide
-
-        return log_prob
-
-    def simpo_loss(self, policy_chosen_logps: torch.FloatTensor,
-                   policy_rejected_logps: torch.FloatTensor,
-                #    lengths_chosen: torch.FloatTensor,
-                #    lengths_rejected: torch.FloatTensor,
-                   beta: float,
-                   gamma: float) -> torch.FloatTensor:
-        """Compute the SimPO loss for a batch of policy log probabilities and sequence lengths.
-
-        Args:
-            policy_chosen_logps: Log probabilities of the policy model for the chosen responses. Shape: (batch_size,)
-            policy_rejected_logps: Log probabilities of the policy model for the rejected responses. Shape: (batch_size,)
-            lengths_chosen: Lengths of the chosen responses. Shape: (batch_size,)
-            lengths_rejected: Lengths of the rejected responses. Shape: (batch_size,)
-            beta: Scaling parameter for the SimPO loss.
-            gamma: Margin parameter for the SimPO loss.
-
-        Returns:
-            A tensor containing the SimPO loss for each example in the batch.
-        """
-        # normalized_chosen_logps = policy_chosen_logps / lengths_chosen
-        # normalized_rejected_logps = policy_rejected_logps / lengths_rejected
-        normalized_chosen_logps = policy_chosen_logps
-        normalized_rejected_logps = policy_rejected_logps
-        # if torch.isnan(normalized_chosen_logps).any():
-        #     print(policy_chosen_logps)
-        # if torch.isnan(normalized_rejected_logps).any():
-        #     print(policy_rejected_logps)
-        logits = beta * (normalized_chosen_logps - normalized_rejected_logps) - gamma
-        losses = -F.logsigmoid(logits)
-        
-        return losses
-
-    def compute_loss(self, log_prob, return_outputs=False):
-        # outputs = model(**inputs)
-        # # noise_levels = inputs['noise_levels']
-        # logits = outputs.logits
-        # labels = inputs['labels']
-
-        log_prob = log_prob
-    
-        group_size = 2
-        batch_size = log_prob.size(0)
-        num_groups = batch_size // group_size
-    
-            # if batch_size % group_size != 0:
-            #     raise ValueError("Batch size must be divisible by the group size")
-        # lengths = (log_prob != 0)
-        # lengths = lengths.sum(dim=-1).float().view(num_groups, group_size)
-        log_prob = log_prob.view(num_groups, group_size)
-        #     # average_log_prob = average_log_prob.view(num_groups, group_size)
-        # lengths1=(labels != -100 )
-        # lengths2=(labels != -200 )
-        # lengths = (lengths1*lengths2).sum(dim=-1).float().view(num_groups, group_size)
-        # print(log_prob)
-        best_log_prob = log_prob[:, 0]
-        worst_log_prob = log_prob[:, 1]
-        # best_length = lengths[:, 0]
-        # worst_length = lengths[:, 1]
-    
-        losses = self.simpo_loss(
-                best_log_prob,
-                worst_log_prob,
-                # best_length,
-                # worst_length,
-                beta=1.5,
-                gamma=0.5
-            )
-    
-        total_simpo_loss = losses.mean()
-        total_loss = total_simpo_loss
-        
-        # print(total_loss)
-        # else:
-        #     total_loss = outputs.loss
-        #     print(total_loss,"2")
-        # if torch.isnan(total_loss):
-        #     total_loss = outputs.loss
-        #     print(total_loss)
-    
-        # assert total_loss > 0
-        return total_loss
-        # return outputs.loss
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
@@ -380,14 +224,8 @@ class CambrianTrainer(Trainer):
             return loss_mb.reduce_mean().detach().to(self.args.device)
 
         with self.compute_loss_context_manager():
-            outputs = model(**inputs)
-            logits = outputs.logits
-            labels = inputs['input_ids']
+            loss = self.compute_loss(model, inputs)
 
-            log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
-            loss = self.compute_loss(log_prob)
-            loss = outputs.loss
-            loss = 0.5*loss + 0.5*outputs.loss
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
@@ -568,7 +406,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('shusheng')
         blob = bucket.blob(RNG_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
@@ -604,7 +442,7 @@ class CambrianTrainer(Trainer):
 
         # connect to gcloud bucket
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('shusheng')
 
         # Loading opt state to each device
         blob = bucket.blob(SHARD_NAME_PATH)
@@ -653,7 +491,7 @@ class CambrianTrainer(Trainer):
 
         # Loading the model weights:
         client = storage.Client()
-        bucket = client.get_bucket('us-central2-storage')
+        bucket = client.get_bucket('shusheng')
         blob = bucket.blob(SHARD_NAME_PATH)
         blob_bytes = blob.download_as_bytes()
         buffer = io.BytesIO(blob_bytes)
