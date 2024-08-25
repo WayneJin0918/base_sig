@@ -1419,8 +1419,8 @@ def train(INDEX, attn_implementation=None):
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     local_rank = training_args.local_rank
-    # compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-    compute_dtype = None
+    compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
+    # compute_dtype = None
     # verify that the train_batch_size is set correctly
     if training_args.batch_size is not None:
         if IS_XLA_AVAILABLE:
@@ -1440,8 +1440,8 @@ def train(INDEX, attn_implementation=None):
     # TPU Note, the original LLaMA RMSNorm implementation has a bug here, the dtype conversion is not correct. It is ok in GPU but kills TPU training.
     def forward(self, hidden_states):
         input_dtype = hidden_states.dtype
-        # hidden_states = hidden_states.to(torch.float32)
-        hidden_states = hidden_states.float()
+        hidden_states = hidden_states.to(torch.float32)
+        # hidden_states = hidden_states.float()
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         output = (self.weight * hidden_states).to(input_dtype)
