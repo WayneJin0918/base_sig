@@ -28,7 +28,7 @@ export WANDB_NAME=$exp_name
 # export WANDB_MODE="disabled"
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path ~/cambrian-8b-finetune-llm-base/checkpoint-last/hf \
+    --model_name_or_path ~/cambrian-8b-finetune-llm-base/checkpoint-last/hf/hf \
     --version llama_v3 \
     --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data/ \
