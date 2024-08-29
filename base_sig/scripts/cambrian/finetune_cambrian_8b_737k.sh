@@ -2,7 +2,7 @@
 export PJRT_DEVICE=TPU
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-737k"
+export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="~/ckpt/$CKPT_NAME"
@@ -16,7 +16,7 @@ if [ "$LLAVA_DEBUG" = "1" ]; then
     export WANDB_MODE=disabled
 fi
 
-exp_name=cambrian_reproduce_siglip_737k
+exp_name=cambrian_post_training_737k
 
 export WANDB_API_KEY="2bfd61b1549a21d11093d9fd3f83063b390034e2"
 export WANDB_ENTITY=nyu-visionx
@@ -28,7 +28,7 @@ export WANDB_NAME=$exp_name
 # export WANDB_MODE="disabled"
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path ~/cambrian-8b-finetune-llm-base/checkpoint-last/hf \
     --version llama_v3 \
     --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data/ \
