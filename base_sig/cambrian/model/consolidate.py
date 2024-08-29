@@ -6,6 +6,8 @@ from tqdm import tqdm
 
 import torch
 
+from cambrian.model import CambrianLlamaForCausalLM
+
 
 def _numel(shape):
     numel = 1
@@ -206,24 +208,58 @@ def consolidate_sharded_model_checkpoints(ckpt_prefix,
     return full_state_dict, actual_save_path
 
 
-def main(ckpt_path, ckpt_prefix, ckpt_suffix, save_path, skip_existing=False):
+def hf_converter(
+    ckpt_path,
+    tpu_state_dict,
+    llm_model_name="lmsys/vicuna-7b-v1.5",
+):
+
+    print(f"Loading model from {llm_model_name}")
+    from cambrian.model.language_model.cambrian_llama import CambrianConfig
+    # from llava.model.language_model.llava_llama import LlavaConfig
+    # from llava.model.language_model.llava_mistral import LlavaMistralConfig as LlavaConfig
+    # from llava.model.language_model.llava_cohere import LlavaCohereConfig as LlavaConfig
+    config = CambrianConfig.from_pretrained(ckpt_path)
+    model = CambrianLlamaForCausalLM.from_pretrained(
+        llm_model_name,
+        config=config,
+        cache_dir=None,
+        torch_dtype=None,
+    )
+
+    # required for Midas unfrozen?
+    # vision_tower = model.get_vision_tower()
+    # if not vision_tower.is_loaded:
+    #     vision_tower.load_model()
+
+    # print(f"Loading state dict from {state_dict_path}")
+    model.load_state_dict(tpu_state_dict, strict=True)
+    model.generation_config.do_sample = True
+    state_dict = {}
+    for k, v in model.state_dict().items():
+        state_dict[k] = v
+
+    model.save_pretrained(ckpt_path, state_dict=state_dict)
+    print(f"Saved converted HF model to {ckpt_path}")
+
+
+def main(ckpt_path, ckpt_prefix, ckpt_suffix, llm_model_name, skip_existing=False):
 
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(f"Checkpoint path {ckpt_path} does not exist")
     elif not os.path.isdir(ckpt_path):
         raise FileNotFoundError(
             f"Checkpoint path {ckpt_path} is not a directory")
-    elif os.path.exists(save_path):
-        if skip_existing:
-            print(f"Save path {save_path} already exists. Passed `skip_existing=True`, skipping...")
-            return
-        print(f"Save path {save_path} already exists. Passed `skip_existing=False`, overwriting...")
+    # elif os.path.exists(save_path):
+    #     if skip_existing:
+    #         print(f"Save path {save_path} already exists. Passed `skip_existing=True`, skipping...")
+    #         return
+    #     print(f"Save path {save_path} already exists. Passed `skip_existing=False`, overwriting...")
 
     print(f"""Consolidating checkpoints:
     Path: {ckpt_path}
     Prefix: {ckpt_prefix}
     Suffix: {ckpt_suffix}
-    Saving to: {save_path}
     """)
 
     ckpt_prefix = os.path.join(ckpt_path, ckpt_prefix)
@@ -234,10 +270,15 @@ def main(ckpt_path, ckpt_prefix, ckpt_suffix, save_path, skip_existing=False):
         save_model=False
     )
 
-    print(f"Successfully consolidated checkpoints. Saving to {save_path}")
-    torch.save(state_dict, save_path)
+    # print(f"Successfully consolidated checkpoints. Saving to {save_path}")
+    # torch.save(state_dict, save_path)
 
-    print(f"Saved consolidated model to {save_path}")
+    # print(f"Saved consolidated model to {save_path}")
+    
+    print("Successfully consolidated checkpoints. Start converting to HF models.")
+    
+    hf_converter(ckpt_path, state_dict, llm_model_name)
+    
 
 
 if __name__ == '__main__':
@@ -246,10 +287,8 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt_path', type=str, required=True)
     parser.add_argument('--ckpt_prefix', type=str, default='model_ckpt')
     parser.add_argument('--ckpt_suffix', type=str, default='_rank-*-of-*.pth')
-    parser.add_argument('--save_filename', type=str, default='full_model.pth')
+    parser.add_argument('--llm_model_name', type=str, default='lmsys/vicuna-7b-v1.5')
     parser.add_argument('--skip_existing', action='store_true', default=False, help='Skip if the save path already exists')
     args = parser.parse_args()
 
-    save_path = os.path.join(args.ckpt_path, args.save_filename)
-
-    main(args.ckpt_path, args.ckpt_prefix, args.ckpt_suffix, save_path, args.skip_existing)
+    main(args.ckpt_path, args.ckpt_prefix, args.ckpt_suffix, args.llm_model_name, args.skip_existing)
