@@ -80,12 +80,12 @@ python cambrian/train/train_tpu.py \
     --resume_from_checkpoint /home/shusheng/checkpoints/ImpLangSup/cambrian-8b-finetune-llm-base-posttrain-737k/checkpoint-1000
 
 
-# CKPT_PATH=~/ckpt/$CKPT_NAME
-# # check if the checkpoint path exists
-# if [ ! -d "$CKPT_PATH" ]; then
-#     echo "Checkpoint path does not exist. Exiting..."
-#     exit 1
-# fi
-# echo "Training finished. Syncing checkpoints to GCS..."
-# gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
-# echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
+CKPT_PATH=checkpoints/$CKPT_NAME
+# check if the checkpoint path exists
+if [ ! -d "$CKPT_PATH" ]; then
+    echo "Checkpoint path does not exist. Exiting..."
+    exit 1
+fi
+echo "Training finished. Syncing checkpoints to GCS..."
+gcloud alpha storage rsync $CKPT_PATH  gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last
+echo "Syncing finished. Checkpoints are now available at gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last"
