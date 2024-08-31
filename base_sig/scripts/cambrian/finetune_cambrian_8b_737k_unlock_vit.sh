@@ -61,7 +61,7 @@ python cambrian/train/train_tpu.py \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 10 \
+    --save_steps 2 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
