@@ -61,7 +61,7 @@ python cambrian/train/train_tpu.py \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 500 \
+    --save_steps 100 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
@@ -76,10 +76,7 @@ python cambrian/train/train_tpu.py \
     --report_to wandb \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json \
-    --train_continue True \
-    --resume_from_checkpoint /home/shusheng/cambrian-8b-finetune-llm-base-posttrain-737k-unlock-vit/checkpoint-500
-
+    --fsdp_config fsdp_config.json
 
 CKPT_PATH=checkpoints/$CKPT_NAME
 # check if the checkpoint path exists
