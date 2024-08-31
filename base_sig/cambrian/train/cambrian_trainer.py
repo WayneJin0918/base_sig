@@ -537,6 +537,8 @@ class CambrianTrainer(Trainer):
         lr_scheduler_state_dict = self.lr_scheduler.state_dict()
 
         # Final form of model and opt
+        print("Saving checkpoint...")
+        print(self.model)
         ckpt = {
             'model': self.model.state_dict(),
             'shard_metadata': self.model.get_shard_metadata()
