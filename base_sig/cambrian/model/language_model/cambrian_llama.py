@@ -474,6 +474,9 @@ class CambrianLlamaForCausalLM(LlamaForCausalLM, CambrianMetaForCausalLM):
             self.global_context_feature = global_context_feature
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
+            # remove the vision_tower_aux_feature_list to prevent false judgement in Line 372
+            if hasattr(self, "vision_tower_aux_feature_list"):
+                del self.vision_tower_aux_feature_list
 
         return super().generate(
             position_ids=position_ids,
