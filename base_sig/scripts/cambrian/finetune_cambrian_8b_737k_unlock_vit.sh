@@ -56,12 +56,12 @@ python cambrian/train/train_tpu.py \
     --bf16 False \
     --output_dir gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 2 \
+    --save_steps 200 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
@@ -69,7 +69,7 @@ python cambrian/train/train_tpu.py \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --tf32 False \
-    --model_max_length 1024 \
+    --model_max_length 2048 \
     --gradient_checkpointing True \
     --dataloader_num_workers ${num_workers:-4} \
     --lazy_preprocess True \
