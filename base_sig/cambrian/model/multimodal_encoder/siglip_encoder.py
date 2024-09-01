@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 from open_clip import create_model_from_pretrained 
 
+from cambrian.utils import IS_XLA_AVAILABLE
+
 from .base_encoder import ProcessorWrapper
 from .clip_encoder import ClipVisionTower
 
@@ -95,8 +97,11 @@ class SiglipVisionTower(ClipVisionTower):
     # force to xla device, to avoid incompatibility with FSDP
     @property
     def device(self):
-        import torch_xla.core.xla_model as xm
-        return xm.xla_device()
+        if IS_XLA_AVAILABLE:
+            import torch_xla.core.xla_model as xm
+            return xm.xla_device()
+        else:
+            return self.vision_tower.patch_embed.proj.weight.device
 
     def _forward(self, images, interpolate_token = 576):
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
