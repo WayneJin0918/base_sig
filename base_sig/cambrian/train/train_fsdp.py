@@ -1553,6 +1553,11 @@ def train(INDEX, attn_implementation=None):
                 torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
                 **bnb_model_from_pretrained_args
             )
+            if training_args.unfreeze_mm_vision_tower:
+                # if vision tower is trainable, add vision tower to fsdp
+                training_args.fsdp_config["transformer_layer_cls_to_wrap"].extend([
+                    "Block", # for siglip
+                ])
     else:
         logger.warning(f"No vision tower, loading pure language model: {model_args.model_name_or_path}")
         model = transformers.LlamaForCausalLM.from_pretrained(
