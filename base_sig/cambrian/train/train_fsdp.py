@@ -1745,6 +1745,9 @@ def train(INDEX, attn_implementation=None):
     if training_args.bf16:
         model = model.to(dtype=torch.float32)
 
+    import torch_xla.core.xla_model as xm
+    model = model.to(xm.xla_device())
+
     callbacks = []
 
     # if "wandb" in training_args.report_to:

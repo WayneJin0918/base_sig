@@ -538,8 +538,6 @@ class CambrianTrainer(Trainer):
 
         # Final form of model and opt
         print("Saving checkpoint...")
-        print(self.model)
-        assert False, print(self.model)
         ckpt = {
             'model': self.model.state_dict(),
             'shard_metadata': self.model.get_shard_metadata()

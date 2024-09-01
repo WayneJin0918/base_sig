@@ -91,6 +91,12 @@ class SiglipVisionTower(ClipVisionTower):
             image_features = image_features.flatten(1, 2)
 
         return image_features
+    
+    # force to xla device, to avoid incompatibility with FSDP
+    @property
+    def device(self):
+        import torch_xla.core.xla_model as xm
+        return xm.xla_device()
 
     def _forward(self, images, interpolate_token = 576):
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
