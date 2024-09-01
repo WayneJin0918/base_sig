@@ -1,5 +1,6 @@
 
 export PJRT_DEVICE=TPU
+export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-unlock-vit-lock-llm"
@@ -62,7 +63,7 @@ python cambrian/train/train_tpu.py \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 500 \
+    --save_steps 200 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
