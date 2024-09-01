@@ -1,5 +1,6 @@
 
 export PJRT_DEVICE=TPU
+export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
 export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-0p1x7m"
@@ -51,11 +52,11 @@ TRAIN_ARGS="
     --data_path $HOME/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data/ \
     --pretrain_mm_mlp_adapter $HOME/mm_projector.pth \
-    --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
-    --vision_tower_aux_token_len_list '[576]' \
+    --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
+    --vision_tower_aux_token_len_list [576] \
     --image_token_len 576 \
     --num_query_group 1 \
-    --query_num_list '[576]' \
+    --query_num_list [576] \
     --connector_depth 3 \
     --image_position 91 \
     --vision_hidden_size 1024 \
@@ -76,14 +77,14 @@ TRAIN_ARGS="
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
-    --evaluation_strategy "no" \
-    --save_strategy "steps" \
+    --evaluation_strategy no \
+    --save_strategy steps \
     --save_steps 500 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
-    --lr_scheduler_type "cosine" \
+    --lr_scheduler_type cosine \
     --logging_steps 1 \
     --tf32 False \
     --model_max_length 2048 \
@@ -92,7 +93,7 @@ TRAIN_ARGS="
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
-    --fsdp "full_shard" \
+    --fsdp full_shard \
     --fsdp_config fsdp_config.json \
 "
 
