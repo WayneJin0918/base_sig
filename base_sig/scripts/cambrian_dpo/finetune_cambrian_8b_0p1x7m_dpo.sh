@@ -73,11 +73,11 @@ TRAIN_ARGS="
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
-    --bf16 False \
+    --bf16 True \
     --output_dir gs://weiyang2/$CKPT_NAME \
     --num_train_epochs 0.1 \
     --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy no \
     --save_strategy steps \
