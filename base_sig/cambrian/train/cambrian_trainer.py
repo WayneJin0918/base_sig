@@ -759,7 +759,7 @@ class CambrianTrainer(Trainer):
         group_size = 2
         batch_size = log_prob.size(0)
         num_groups = batch_size // group_size
-    
+        
         log_prob = log_prob.view(num_groups, group_size)
         best_log_prob = log_prob[:, 0]
         worst_log_prob = log_prob[:, 1]
