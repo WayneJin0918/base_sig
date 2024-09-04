@@ -127,9 +127,15 @@ class CambrianMetaModel:
             else:
                 self.vision_tower_aux_list = vision_tower_aux_list
         else:
-            vision_tower_aux_list = self.vision_tower_aux_list
-            for vision_tower_aux in vision_tower_aux_list:
+            for vision_tower_aux in self.vision_tower_aux_list:
                 vision_tower_aux.load_model()
+
+            # if vision_tower is trainable, it should be wrapped by nn.ModuleList
+            if model_args.unfreeze_mm_vision_tower and not isinstance(self.vision_tower_aux_list, nn.ModuleList):
+                if isinstance(self.vision_tower_aux_list, list):
+                    self.vision_tower_aux_list = nn.ModuleList(self.vision_tower_aux_list)
+                else:
+                    raise NotImplementedError(f"Cannot convert vision_tower_aux_list to nn.ModuleList: Unsupported type {type(self.vision_tower_aux_list)}")
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(model_args, 'mm_projector_type', 'linear')

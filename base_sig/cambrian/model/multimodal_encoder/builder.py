@@ -1,6 +1,9 @@
 import os
 import copy
 
+import torch
+import torch.nn as nn
+
 from ezcolorlog import root_logger as logger
 
 from .clip_encoder import ClipVisionTower
@@ -145,4 +148,7 @@ def build_vision_tower_aux_list(vision_tower_cfg, **kwargs):
             vision_tower_aux_list.append(SAMVisionTower(vision_tower_aux_name, args=config, **kwargs))
         else:
             raise ValueError(f'Unknown vision tower: {vision_tower_aux_name}')
+    
+    if vision_tower_cfg.unfreeze_mm_vision_tower and vision_tower_cfg.mm_vision_tower_lr is not None:
+        vision_tower_aux_list = nn.ModuleList(vision_tower_aux_list)
     return vision_tower_aux_list

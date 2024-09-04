@@ -1,8 +1,9 @@
 
 export PJRT_DEVICE=TPU
+export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base"
+export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-unlock-vit"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="~/ckpt/$CKPT_NAME"
@@ -16,7 +17,7 @@ if [ "$LLAVA_DEBUG" = "1" ]; then
     export WANDB_MODE=disabled
 fi
 
-exp_name=cambrian_reproduce
+exp_name=cambrian_post_training_737k_unlock_vit
 
 export WANDB_API_KEY="2bfd61b1549a21d11093d9fd3f83063b390034e2"
 export WANDB_ENTITY=nyu-visionx
@@ -28,9 +29,9 @@ export WANDB_NAME=$exp_name
 # export WANDB_MODE="disabled"
 
 python cambrian/train/train_tpu.py \
-    --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
+    --model_name_or_path ~/cambrian-8b-finetune-llm-base/checkpoint-last/hf \
     --version llama_v3 \
-    --data_path ~/Cambrian7M_withsystemprompt.jsonl \
+    --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data/ \
     --pretrain_mm_mlp_adapter ~/mm_projector.pth \
     --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
@@ -46,7 +47,8 @@ python cambrian/train/train_tpu.py \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
-    --unfreeze_mm_vision_tower False \
+    --unfreeze_mm_vision_tower True \
+    --mm_vision_tower_lr 4e-5 \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
@@ -55,12 +57,12 @@ python cambrian/train/train_tpu.py \
     --bf16 False \
     --output_dir gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 500 \
+    --save_steps 200 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
@@ -75,17 +77,14 @@ python cambrian/train/train_tpu.py \
     --report_to wandb \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json \
-    --train_continue True \
-    --resume_from_checkpoint /home/shusheng/checkpoints/ImpLangSup/cambrian-8b-finetune-llm-base/checkpoint-12500
+    --fsdp_config fsdp_config.json
 
-
-# CKPT_PATH=~/ckpt/$CKPT_NAME
-# # check if the checkpoint path exists
-# if [ ! -d "$CKPT_PATH" ]; then
-#     echo "Checkpoint path does not exist. Exiting..."
-#     exit 1
-# fi
-# echo "Training finished. Syncing checkpoints to GCS..."
-# gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
-# echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
+CKPT_PATH=checkpoints/$CKPT_NAME
+# check if the checkpoint path exists
+if [ ! -d "$CKPT_PATH" ]; then
+    echo "Checkpoint path does not exist. Exiting..."
+    exit 1
+fi
+echo "Training finished. Syncing checkpoints to GCS..."
+gcloud alpha storage rsync $CKPT_PATH  gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last
+echo "Syncing finished. Checkpoints are now available at gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last"

@@ -57,8 +57,8 @@ from cambrian.train.gcloud_rsync_callback import GCloudRsyncCallback
 
 logger.setLevel(logging.WARNING)
 
-
-
+import random
+from PIL import Image, ImageFilter
 
 
 local_rank = None
@@ -172,6 +172,10 @@ class TrainingArguments(transformers.TrainingArguments):
 
     train_continue: bool = False
     resume_from_checkpoint: Optional[str] = ""
+    
+    # for dpo training
+    dpo: bool = False
+    noise_level: Optional[str] = "[0, 50]"
 
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
@@ -908,6 +912,35 @@ def preprocess(
     return dict(input_ids=input_ids, labels=targets)
 
 
+def add_noise_to_images(image: Image.Image, noise_levels: List[float], block_size: int = 16) -> List[tuple[Image.Image, float]]:
+    noisy_images = []
+    for noise_level in noise_levels:
+        radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
+        blurred_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
+        mixed_image = mixup_images(image, blurred_image, noise_level, block_size=block_size)
+        noisy_images.append(mixed_image)
+    return noisy_images
+
+def mixup_images(original: Image.Image, blurred: Image.Image, noise_level: float, block_size: int = 16) -> List[tuple[Image.Image, float]]:
+        width, height = original.size
+        block_width, block_height = width // block_size, height // block_size
+        
+        mixed_image = blurred.copy()
+        
+        use_original_probability = 1-noise_level / 100
+        
+        for i in range(block_size):
+            for j in range(block_size):
+                if random.random() < use_original_probability:
+                    x1, y1 = i * block_width, j * block_height
+                    x2, y2 = x1 + block_width, y1 + block_height
+                    x2 = min(x2, width)
+                    y2 = min(y2, height)
+                    block = original.crop((x1, y1, x2, y2))
+                    mixed_image.paste(block, (x1, y1))
+                    
+        return mixed_image
+
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -978,6 +1011,11 @@ class LazySupervisedDataset(Dataset):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
         has_image = self._has_image(dat)
+        
+        if self.data_args.dpo and not has_image:
+            # NOTE: dpo loss is now meaningless to pure-language data sample
+            return self.__getitem__(random.randint(0, len(self) - 1))
+
         if has_image:
             image_file = dat['image']
             image_folder = self.data_args.image_folder
@@ -1010,8 +1048,13 @@ class LazySupervisedDataset(Dataset):
                 image_aux = image
                 target_resolution = processor_aux.crop_size['height']
                 image_aux =  expand2square(image_aux, tuple(int(x*255) for x in processor_aux.image_mean)).resize((target_resolution, target_resolution))
-                image_aux = processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0]
-                image_aux_list.append(image_aux)
+                if not self.data_args.dpo:
+                    image_aux = processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0]
+                    image_aux_list.append(image_aux)
+                else:
+                    image_auxs = add_noise_to_images(image, self.data_args.noise_level)
+                    image_auxs = torch.stack([processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0] for image_aux in image_auxs])
+                    image_aux_list.append(image_auxs)
 
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
@@ -1177,6 +1220,8 @@ class DataCollatorForSupervisedDataset(object):
     image_token_len: int
     image_aux_token_len_list: list
     image_position: int
+    dpo: bool
+    noise_level: list
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
 
@@ -1235,12 +1280,27 @@ class DataCollatorForSupervisedDataset(object):
         )
 
         if 'image_aux_list' in instances[0]:
-            image_aux_list = [instance['image_aux_list'] for instance in instances]
-            image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
-            if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
-                batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
+            if self.dpo:
+                for key in batch.keys():
+                    if isinstance(batch[key], torch.Tensor):
+                        batch[key] = batch[key].repeat_interleave(len(self.noise_level), dim=0)
+                    elif isinstance(batch[key], list) and isinstance(batch[key][0], torch.Tensor):
+                        batch[key] = [_.repeat_interleave(len(self.noise_level), dim=0) for _ in batch[key]]
+                    else:
+                        raise ValueError(f"Unknown data type {type(batch[key])}")
+                image_aux_list = [instance['image_aux_list'] for instance in instances]
+                image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
+                if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
+                    batch['images'] = [torch.concat(image_aux, dim=0) for image_aux in image_aux_list]
+                else:
+                    batch['images'] = image_aux_list
             else:
-                batch['images'] = image_aux_list
+                image_aux_list = [instance['image_aux_list'] for instance in instances]
+                image_aux_list = [list(batch_image_aux) for batch_image_aux in zip(*image_aux_list)]
+                if all(x is not None and x.shape == image_aux_list[0][0].shape for x in image_aux_list[0]):
+                    batch['images'] = [torch.stack(image_aux) for image_aux in image_aux_list]
+                else:
+                    batch['images'] = image_aux_list
 
         return batch
 
@@ -1265,6 +1325,9 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
 
     if hasattr(data_args, 'image_position'):
         data_collator_kwargs['image_position'] = data_args.image_position
+    
+    data_collator_kwargs['dpo'] = data_args.dpo
+    data_collator_kwargs['noise_level'] = data_args.noise_level
 
     data_collator = DataCollatorForSupervisedDataset(**data_collator_kwargs)
 
@@ -1418,9 +1481,15 @@ def train(INDEX, attn_implementation=None):
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    
+    if training_args.dpo:
+        training_args.noise_level = json.loads(training_args.noise_level)
+    data_args.dpo = training_args.dpo
+    data_args.noise_level = training_args.noise_level
+    
     local_rank = training_args.local_rank
-    compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-    # compute_dtype = None
+    # compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
+    compute_dtype = None
     # verify that the train_batch_size is set correctly
     if training_args.batch_size is not None:
         if IS_XLA_AVAILABLE:
@@ -1440,8 +1509,8 @@ def train(INDEX, attn_implementation=None):
     # TPU Note, the original LLaMA RMSNorm implementation has a bug here, the dtype conversion is not correct. It is ok in GPU but kills TPU training.
     def forward(self, hidden_states):
         input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        # hidden_states = hidden_states.float()
+        # hidden_states = hidden_states.to(torch.float32)
+        hidden_states = hidden_states.float()
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         output = (self.weight * hidden_states).to(input_dtype)
@@ -1487,7 +1556,7 @@ def train(INDEX, attn_implementation=None):
 
     use_cohere = False
     data_args.image_token_len = model_args.image_token_len
-    
+
     if model_args.vision_tower_aux_list is not None:
         # copy image_token_len and image_position to model_args
         # data_args.image_token_len = model_args.image_token_len
@@ -1553,6 +1622,11 @@ def train(INDEX, attn_implementation=None):
                 torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
                 **bnb_model_from_pretrained_args
             )
+            if training_args.unfreeze_mm_vision_tower:
+                # if vision tower is trainable, add vision tower to fsdp
+                training_args.fsdp_config["transformer_layer_cls_to_wrap"].extend([
+                    "Block", # for siglip
+                ])
     else:
         logger.warning(f"No vision tower, loading pure language model: {model_args.model_name_or_path}")
         model = transformers.LlamaForCausalLM.from_pretrained(
@@ -1744,6 +1818,9 @@ def train(INDEX, attn_implementation=None):
 
     if training_args.bf16:
         model = model.to(dtype=torch.float32)
+
+    import torch_xla.core.xla_model as xm
+    model = model.to(xm.xla_device())
 
     callbacks = []
 

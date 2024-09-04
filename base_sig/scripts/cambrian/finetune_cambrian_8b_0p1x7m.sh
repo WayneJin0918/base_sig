@@ -1,11 +1,12 @@
 
 export PJRT_DEVICE=TPU
+export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base"
+export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-0p1x7m"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
-export CKPT_DIR="~/ckpt/$CKPT_NAME"
+export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
 
 # debug flags
 if [ "$LLAVA_DEBUG" = "1" ]; then
@@ -16,7 +17,7 @@ if [ "$LLAVA_DEBUG" = "1" ]; then
     export WANDB_MODE=disabled
 fi
 
-exp_name=cambrian_reproduce
+exp_name=cambrian_post_training_0p1x7m
 
 export WANDB_API_KEY="2bfd61b1549a21d11093d9fd3f83063b390034e2"
 export WANDB_ENTITY=nyu-visionx
@@ -27,17 +28,35 @@ export WANDB_NAME=$exp_name
 
 # export WANDB_MODE="disabled"
 
-python cambrian/train/train_tpu.py \
-    --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
+# Default values
+
+resume=""
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --resume)
+        resume="$2"
+        shift 2
+        ;;
+    *)
+        echo "Unknown argument: $1"
+        exit 1
+        ;;
+  esac
+done
+
+TRAIN_ARGS="
+    --model_name_or_path $HOME/cambrian-8b-finetune-llm-base/checkpoint-last/hf \
     --version llama_v3 \
-    --data_path ~/Cambrian7M_withsystemprompt.jsonl \
+    --data_path $HOME/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data/ \
-    --pretrain_mm_mlp_adapter ~/mm_projector.pth \
-    --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
-    --vision_tower_aux_token_len_list '[576]' \
+    --pretrain_mm_mlp_adapter $HOME/mm_projector.pth \
+    --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
+    --vision_tower_aux_token_len_list [576] \
     --image_token_len 576 \
     --num_query_group 1 \
-    --query_num_list '[576]' \
+    --query_num_list [576] \
     --connector_depth 3 \
     --image_position 91 \
     --vision_hidden_size 1024 \
@@ -54,18 +73,18 @@ python cambrian/train/train_tpu.py \
     --group_by_modality_length True \
     --bf16 False \
     --output_dir gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME \
-    --num_train_epochs 1 \
-    --per_device_train_batch_size 2 \
+    --num_train_epochs 0.1 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
-    --evaluation_strategy "no" \
-    --save_strategy "steps" \
+    --evaluation_strategy no \
+    --save_strategy steps \
     --save_steps 500 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
-    --lr_scheduler_type "cosine" \
+    --lr_scheduler_type cosine \
     --logging_steps 1 \
     --tf32 False \
     --model_max_length 2048 \
@@ -74,18 +93,28 @@ python cambrian/train/train_tpu.py \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name $CKPT_NAME \
-    --fsdp "full_shard" \
+    --fsdp full_shard \
     --fsdp_config fsdp_config.json \
-    --train_continue True \
-    --resume_from_checkpoint /home/shusheng/checkpoints/ImpLangSup/cambrian-8b-finetune-llm-base/checkpoint-12500
+"
 
+if [ -n "$resume" ]; then
+    TRAIN_ARGS="$TRAIN_ARGS \
+        --train_continue True \
+        --resume_from_checkpoint $resume \
+    "
+fi
 
-# CKPT_PATH=~/ckpt/$CKPT_NAME
-# # check if the checkpoint path exists
-# if [ ! -d "$CKPT_PATH" ]; then
-#     echo "Checkpoint path does not exist. Exiting..."
-#     exit 1
-# fi
-# echo "Training finished. Syncing checkpoints to GCS..."
-# gcloud alpha storage rsync $CKPT_PATH gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME
-# echo "Syncing finished. Checkpoints are now available at gs://my-tpu-bucket-weiyang/cambrian/checkpoints/$CKPT_NAME"
+echo $TRAIN_ARGS
+
+python cambrian/train/train_tpu.py \
+    $TRAIN_ARGS
+
+CKPT_PATH=checkpoints/$CKPT_NAME
+# check if the checkpoint path exists
+if [ ! -d "$CKPT_PATH" ]; then
+    echo "Checkpoint path does not exist. Exiting..."
+    exit 1
+fi
+echo "Training finished. Syncing checkpoints to GCS..."
+gcloud alpha storage rsync $CKPT_PATH  gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last
+echo "Syncing finished. Checkpoints are now available at gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last"

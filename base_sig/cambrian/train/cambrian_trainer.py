@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 from torch.utils.data import Sampler
 
 import dataclasses
@@ -224,7 +224,15 @@ class CambrianTrainer(Trainer):
             return loss_mb.reduce_mean().detach().to(self.args.device)
 
         with self.compute_loss_context_manager():
-            loss = self.compute_loss(model, inputs)
+            if self.args.dpo:
+                outputs = model(**inputs)
+                logits = outputs.logits
+                labels = inputs['input_ids']
+
+                log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+                loss = self.compute_loss_dpo(log_prob)
+            else:
+                loss = self.compute_loss(model, inputs)
 
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -537,6 +545,7 @@ class CambrianTrainer(Trainer):
         lr_scheduler_state_dict = self.lr_scheduler.state_dict()
 
         # Final form of model and opt
+        print("Saving checkpoint...")
         ckpt = {
             'model': self.model.state_dict(),
             'shard_metadata': self.model.get_shard_metadata()
@@ -680,3 +689,89 @@ class CambrianTrainer(Trainer):
         if self.control.should_save:
             self._save_checkpoint(model, trial, metrics=metrics)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+
+    def get_batch_logps(self, logits: torch.FloatTensor, labels: torch.LongTensor, return_per_token_logp=False, return_all=False) -> torch.FloatTensor:
+        """Compute the log probabilities of the given labels under the given logits.
+
+        Args:
+            logits: Logits of the model (unnormalized). Shape: (batch_size, sequence_length, vocab_size)
+            labels: Labels for which to compute the log probabilities. Label tokens with a value of -100 are ignored. Shape: (batch_size, sequence_length)
+        Returns:
+            A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
+        """
+        assert logits.shape[:-1] == labels.shape
+
+        """
+        # Predefine tensors with fixed shapes
+        batch_size = labels.size(0)
+        sequence_length = labels.size(1)
+        num_classes = logits.size(2)
+
+        # Create zero tensors and copy the required parts into them
+        labels_static = torch.zeros((batch_size, sequence_length - 1)).to(labels.device)
+        logits_static = torch.zeros((batch_size, sequence_length - 1, num_classes)).to(logits.device)
+
+        # Copy the sliced results into the new static tensors
+        labels_static = labels[:, 1:].clone()
+        logits_static = logits[:, :-1, :].clone()
+
+        # If you want to avoid direct slicing, you can build static tensors using concatenation
+        # Assume sequence_length=5, build an index tensor like [1:sequence_length]
+        index_labels = torch.arange(1, sequence_length).to(labels.device)
+        index_logits = torch.arange(0, sequence_length - 1).to(logits.device)
+
+        # Use index selection to create static tensors (gradients will be computed)
+        labels_static = torch.index_select(labels, 1, index_labels).clone()
+        logits_static = torch.index_select(logits, 1, index_logits).clone()
+        """
+
+        # Finally, pass the static tensors to the subsequent parts of the model
+        labels = labels[:, 1:]
+        logits = logits[:, :-1]
+        loss_mask1 = (labels != -100)
+        loss_mask2 = (labels != -200)
+        loss_mask = loss_mask1 * loss_mask2
+        labels[labels == -100] = 0
+        labels[labels == -200] = 0
+
+        logits = logits + 1e-9
+
+        per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
+
+        log_prob = (per_token_logps * loss_mask).sum(-1)
+        return log_prob
+
+    def simpo_loss(self, policy_chosen_logps: torch.FloatTensor,
+                   policy_rejected_logps: torch.FloatTensor,
+                   beta: float,
+                   gamma: float) -> torch.FloatTensor:
+        normalized_chosen_logps = policy_chosen_logps
+        normalized_rejected_logps = policy_rejected_logps
+        logits = beta * (normalized_chosen_logps - normalized_rejected_logps) - gamma
+        losses = -F.logsigmoid(logits)
+        
+        return losses
+
+    def compute_loss_dpo(self, log_prob, return_outputs=False):
+
+        log_prob = log_prob
+    
+        group_size = 2
+        batch_size = log_prob.size(0)
+        num_groups = batch_size // group_size
+    
+        log_prob = log_prob.view(num_groups, group_size)
+        best_log_prob = log_prob[:, 0]
+        worst_log_prob = log_prob[:, 1]
+    
+        losses = self.simpo_loss(
+                best_log_prob,
+                worst_log_prob,
+                beta=0.5,
+                gamma=0.01
+            )
+    
+        total_simpo_loss = losses.mean()
+        total_loss = total_simpo_loss
+        
+        return total_loss

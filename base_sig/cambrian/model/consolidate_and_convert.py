@@ -220,17 +220,13 @@ def hf_converter(
     # from llava.model.language_model.llava_mistral import LlavaMistralConfig as LlavaConfig
     # from llava.model.language_model.llava_cohere import LlavaCohereConfig as LlavaConfig
     config = CambrianConfig.from_pretrained(ckpt_path)
+    
     model = CambrianLlamaForCausalLM.from_pretrained(
         llm_model_name,
         config=config,
         cache_dir=None,
         torch_dtype=None,
     )
-
-    # required for Midas unfrozen?
-    # vision_tower = model.get_vision_tower()
-    # if not vision_tower.is_loaded:
-    #     vision_tower.load_model()
 
     # print(f"Loading state dict from {state_dict_path}")
     model.load_state_dict(tpu_state_dict, strict=True)
@@ -292,3 +288,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args.ckpt_path, args.ckpt_prefix, args.ckpt_suffix, args.llm_model_name, args.skip_existing)
+
