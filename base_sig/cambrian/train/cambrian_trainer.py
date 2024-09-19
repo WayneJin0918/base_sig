@@ -89,31 +89,73 @@ def split_to_even_chunks(indices, lengths, num_chunks):
     return chunks
 
 
-def get_modality_length_grouped_indices(lengths, batch_size, world_size, generator=None):
-    # We need to use torch for the random part as a distributed sampler will set the random seed for torch.
-    assert all(l != 0 for l in lengths), "Should not have zero length."
-    if all(l > 0 for l in lengths) or all(l < 0 for l in lengths):
-        # all samples are in the same modality
-        return get_length_grouped_indices(lengths, batch_size, world_size, generator=generator)
-    mm_indices, mm_lengths = zip(*[(i, l) for i, l in enumerate(lengths) if l > 0])
-    lang_indices, lang_lengths = zip(*[(i, -l) for i, l in enumerate(lengths) if l < 0])
+# def get_modality_length_grouped_indices(lengths, batch_size, world_size, generator=None):
+#     # We need to use torch for the random part as a distributed sampler will set the random seed for torch.
+#     assert all(l != 0 for l in lengths), "Should not have zero length."
+#     if all(l > 0 for l in lengths) or all(l < 0 for l in lengths):
+#         # all samples are in the same modality
+#         return get_length_grouped_indices(lengths, batch_size, world_size, generator=generator)
+#     mm_indices, mm_lengths = zip(*[(i, l) for i, l in enumerate(lengths) if l > 0])
+#     lang_indices, lang_lengths = zip(*[(i, -l) for i, l in enumerate(lengths) if l < 0])
 
-    mm_shuffle = [mm_indices[i] for i in get_length_grouped_indices(mm_lengths, batch_size, world_size, generator=None)]
-    lang_shuffle = [lang_indices[i] for i in get_length_grouped_indices(lang_lengths, batch_size, world_size, generator=None)]
+#     mm_shuffle = [mm_indices[i] for i in get_length_grouped_indices(mm_lengths, batch_size, world_size, generator=None)]
+#     lang_shuffle = [lang_indices[i] for i in get_length_grouped_indices(lang_lengths, batch_size, world_size, generator=None)]
+#     megabatch_size = world_size * batch_size
+#     mm_megabatches = [mm_shuffle[i : i + megabatch_size] for i in range(0, len(mm_shuffle), megabatch_size)]
+#     lang_megabatches = [lang_shuffle[i : i + megabatch_size] for i in range(0, len(lang_shuffle), megabatch_size)]
+
+#     last_mm = mm_megabatches[-1]
+#     last_lang = lang_megabatches[-1]
+#     additional_batch = last_mm + last_lang
+#     megabatches = mm_megabatches[:-1] + lang_megabatches[:-1]
+#     megabatch_indices = torch.randperm(len(megabatches), generator=generator)
+#     megabatches = [megabatches[i] for i in megabatch_indices]
+
+#     if len(additional_batch) > 0:
+#         megabatches.append(sorted(additional_batch))
+
+#     return [i for megabatch in megabatches for i in megabatch]
+
+def get_modality_length_grouped_indices(lengths, batch_size, world_size, generator=None):
+    assert all(l != 0 for l in lengths), "Should not have zero length."
+    
+    # If all samples belong to the same modality, directly return length-grouped indices
+    if all(l > 0 for l in lengths) or all(l < 0 for l in lengths):
+        return get_length_grouped_indices(lengths, batch_size, world_size, generator=generator)
+    
+    # Pre-define modality indices to avoid dynamic separation at runtime
+    mm_indices = [i for i, l in enumerate(lengths) if l > 0]
+    lang_indices = [i for i, l in enumerate(lengths) if l < 0]
+    
+    # Get grouped indices for each modality (handle sorting in advance)
+    mm_shuffle = get_length_grouped_indices([lengths[i] for i in mm_indices], batch_size, world_size, generator)
+    lang_shuffle = get_length_grouped_indices([-lengths[i] for i in lang_indices], batch_size, world_size, generator)
+
     megabatch_size = world_size * batch_size
+    
+    # Split the shuffled modality indices into megabatches
     mm_megabatches = [mm_shuffle[i : i + megabatch_size] for i in range(0, len(mm_shuffle), megabatch_size)]
     lang_megabatches = [lang_shuffle[i : i + megabatch_size] for i in range(0, len(lang_shuffle), megabatch_size)]
 
-    last_mm = mm_megabatches[-1]
-    last_lang = lang_megabatches[-1]
-    additional_batch = last_mm + last_lang
-    megabatches = mm_megabatches[:-1] + lang_megabatches[:-1]
-    megabatch_indices = torch.randperm(len(megabatches), generator=generator)
-    megabatches = [megabatches[i] for i in megabatch_indices]
+    # Merge the last megabatch of each modality if both exist
+    if len(mm_megabatches) > 0 and len(lang_megabatches) > 0:
+        additional_batch = mm_megabatches.pop() + lang_megabatches.pop()
+    else:
+        additional_batch = []
 
+    # Concatenate the remaining megabatches and preserve order or use pre-defined random order
+    megabatches = mm_megabatches + lang_megabatches
+
+    # Perform shuffling in the data loading stage; assume a static random shuffle order here
+    if generator is not None:
+        megabatch_indices = torch.randperm(len(megabatches), generator=generator)
+        megabatches = [megabatches[i] for i in megabatch_indices]
+
+    # Append the additional batch if it exists
     if len(additional_batch) > 0:
-        megabatches.append(sorted(additional_batch))
+        megabatches.append(additional_batch)
 
+    # Return a flattened list of indices
     return [i for megabatch in megabatches for i in megabatch]
 
 
@@ -228,7 +270,8 @@ class CambrianTrainer(Trainer):
                 outputs = model(**inputs)
                 logits = outputs.logits
                 labels = inputs['labels']
-
+                print(labels.size(),"label")
+                print(logits.size(),"logits")
                 log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
                 loss = self.compute_loss_dpo(log_prob)
             else:
@@ -700,7 +743,6 @@ class CambrianTrainer(Trainer):
             A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
         """
         assert logits.shape[:-1] == labels.shape
-
         """
         # Predefine tensors with fixed shapes
         batch_size = labels.size(0)
@@ -724,16 +766,20 @@ class CambrianTrainer(Trainer):
         labels_static = torch.index_select(labels, 1, index_labels).clone()
         logits_static = torch.index_select(logits, 1, index_logits).clone()
         """
-
+        
         # Finally, pass the static tensors to the subsequent parts of the model
+        # labels = labels_static
+        # logits = logits_static
         labels = labels[:, 1:]
         logits = logits[:, :-1]
         loss_mask1 = (labels != -100)
         loss_mask2 = (labels != -200)
         loss_mask = loss_mask1 * loss_mask2
-        labels[labels == -100] = 0
-        labels[labels == -200] = 0
+        # labels[labels == -100] = 0
+        # labels[labels == -200] = 0
 
+        labels = torch.where((labels == -100) | (labels == -200), torch.tensor(0, device=labels.device), labels)
+        
         logits = logits + 1e-9
 
         per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
@@ -759,7 +805,7 @@ class CambrianTrainer(Trainer):
         group_size = 2
         batch_size = log_prob.size(0)
         num_groups = batch_size // group_size
-        
+    
         log_prob = log_prob.view(num_groups, group_size)
         best_log_prob = log_prob[:, 0]
         worst_log_prob = log_prob[:, 1]
