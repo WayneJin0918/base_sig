@@ -49,7 +49,7 @@ done
 TRAIN_ARGS="
     --model_name_or_path /home/wayneyjin/ckpt/cambrian-sig-8b \
     --version llama_v3 \
-    --data_path /home/wayneyjin/ckpt/Cambrian7M_withsystemprompt.jsonl \
+    --data_path /home/wayneyjin/ckpt/Cambrian737k.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
     --pretrain_mm_mlp_adapter /home/wayneyjin/projector/mm_projector.pth \
     --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
@@ -75,13 +75,13 @@ TRAIN_ARGS="
     --group_by_modality_length True \
     --bf16 True \
     --output_dir gs://weiyang2/$CKPT_NAME \
-    --num_train_epochs 0.1 \
+    --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy no \
     --save_strategy steps \
-    --save_steps 500 \
+    --save_steps 1000 \
     --save_total_limit 1 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
@@ -121,4 +121,4 @@ if [ ! -d "$CKPT_PATH" ]; then
 fi
 echo "Training finished. Syncing checkpoints to GCS..."
 gcloud alpha storage rsync $CKPT_PATH  gs://weiyang2/$CKPT_NAME/checkpoint-last
-echo "Syncing finished. Checkpoints are now available at gs://shusheng/checkpoints/ImpLangSup/$CKPT_NAME/checkpoint-last"
+echo "Syncing finished. Checkpoints are now available at gs://weiyang2/$CKPT_NAME/checkpoint-last"
