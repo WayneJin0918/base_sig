@@ -270,8 +270,8 @@ class CambrianTrainer(Trainer):
                 outputs = model(**inputs)
                 logits = outputs.logits
                 labels = inputs['labels']
-                print(labels.size(),"label")
-                print(logits.size(),"logits")
+                # print(labels.size(),"label")
+                # print(logits.size(),"logits")
                 log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
                 loss = self.compute_loss_dpo(log_prob)
             else:
