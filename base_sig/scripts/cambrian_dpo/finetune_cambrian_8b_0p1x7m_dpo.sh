@@ -49,7 +49,7 @@ done
 TRAIN_ARGS="
     --model_name_or_path /home/wayneyjin/ckpt/cambrian-sig-8b \
     --version llama_v3 \
-    --data_path /home/wayneyjin/ckpt/Cambrian737k.jsonl \
+    --data_path /home/wayneyjin/Cambrian737k.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
     --pretrain_mm_mlp_adapter /home/wayneyjin/projector/mm_projector.pth \
     --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
