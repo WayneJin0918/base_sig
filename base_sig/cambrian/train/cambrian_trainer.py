@@ -726,8 +726,8 @@ class CambrianTrainer(Trainer):
         """
 
         # Finally, pass the static tensors to the subsequent parts of the model
-        # labels = labels[:, 1:]
-        # logits = logits[:, :-1]
+        labels = labels[:, 1:]
+        logits = logits[:, :-1]
         loss_mask1 = (labels != -100)
         loss_mask2 = (labels != -200)
         loss_mask = loss_mask1 * loss_mask2
