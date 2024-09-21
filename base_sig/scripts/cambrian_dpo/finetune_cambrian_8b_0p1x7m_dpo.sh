@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-0p1x7m-ils-8e-7"
+export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-0p1x7m-ils-2e-7"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -49,7 +49,7 @@ done
 TRAIN_ARGS="
     --model_name_or_path /home/wayneyjin/ckpt/cambrian-sig-8b \
     --version llama_v3 \
-    --data_path /home/wayneyjin/Cambrian737k.jsonl \
+    --data_path /home/wayneyjin/ckpt/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
     --pretrain_mm_mlp_adapter /home/wayneyjin/projector/mm_projector.pth \
     --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
@@ -75,7 +75,7 @@ TRAIN_ARGS="
     --group_by_modality_length True \
     --bf16 True \
     --output_dir gs://weiyang2/$CKPT_NAME \
-    --num_train_epochs 1 \
+    --num_train_epochs 0.1 \
     --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
@@ -83,7 +83,7 @@ TRAIN_ARGS="
     --save_strategy steps \
     --save_steps 1000 \
     --save_total_limit 1 \
-    --learning_rate 8e-7 \
+    --learning_rate 2e-7 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type cosine \
