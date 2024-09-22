@@ -1640,9 +1640,10 @@ def train(INDEX, attn_implementation=None):
     model.config.use_cache = False
     model.generation_config.do_sample = True
     
-    model.requires_grad_(True)
+    model.requires_grad_(False)
+    model.model.requires_grad_(True)
     if model_args.freeze_backbone:
-        model.requires_grad_(False)
+        model.model.requires_grad_(False)
 
     log_rank0("Model loaded.")
 
