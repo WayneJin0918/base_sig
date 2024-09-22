@@ -126,6 +126,7 @@ class TrainingArguments(transformers.TrainingArguments):
     remove_unused_columns: bool = field(default=False)
     freeze_mm_mlp_adapter: bool = field(default=False)
     unfreeze_mm_vision_tower: bool = field(default=False)
+    tune_mm_projector: bool = field(default=False)
     mpt_attn_impl: Optional[str] = field(default="triton")
     model_max_length: int = field(
         default=512,
@@ -1772,6 +1773,10 @@ def train(INDEX, attn_implementation=None):
                     print_rank0('tuning {}'.format(name))
                     param.requires_grad = True
 
+        if training_args.tune_mm_projector:
+            for p in model.get_model().mm_projector.parameters():
+                p.requires_grad = True
+        
         model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
         if training_args.freeze_mm_mlp_adapter:
             for p in model.get_model().mm_projector.parameters():
