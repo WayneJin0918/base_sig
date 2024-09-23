@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-ils-2e-7-proj-on"
+export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-ils-2e-7-proj-on-4e-5"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -69,6 +69,7 @@ TRAIN_ARGS="
     --freeze_backbone False \
     --mm_vision_tower_lr 4e-5 \
     --mm_projector_lr 4e-5 \
+    --tune_mm_projector True \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
