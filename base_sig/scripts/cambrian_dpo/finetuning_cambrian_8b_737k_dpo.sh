@@ -68,6 +68,7 @@ TRAIN_ARGS="
     --unfreeze_mm_vision_tower True \
     --freeze_backbone False \
     --mm_vision_tower_lr 4e-5 \
+    --mm_projector_lr 4e-5 \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
