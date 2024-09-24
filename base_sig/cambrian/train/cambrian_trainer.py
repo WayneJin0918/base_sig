@@ -813,7 +813,7 @@ class CambrianTrainer(Trainer):
         losses = self.simpo_loss(
                 best_log_prob,
                 worst_log_prob,
-                beta=1,
+                beta=0.4,
                 gamma=0.05
             )
     
