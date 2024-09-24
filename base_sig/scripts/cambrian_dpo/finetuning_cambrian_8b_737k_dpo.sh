@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-dpo-4e-5-llm-on-vision-on-debug"
+export CKPT_NAME="cambrian-8b-finetune-llm-dpo-posttrain-737k-dpo-2e-7-llm-on-vision-on-new-proj"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -51,7 +51,7 @@ TRAIN_ARGS="
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian737k.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
-    --pretrain_mm_mlp_adapter /home/wayneyjin/projector/mm_projector.pth \
+    --pretrain_mm_mlp_adapter /home/wayneyjin/projector/ils_mm_projector.pth \
     --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
     --vision_tower_aux_token_len_list [576] \
     --image_token_len 576 \
@@ -61,7 +61,7 @@ TRAIN_ARGS="
     --image_position 91 \
     --vision_hidden_size 1024 \
     --connector_only False \
-    --num_of_vision_sampler_layers 5 \
+    --num_of_vision_sampler_layers 10 \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
@@ -76,14 +76,14 @@ TRAIN_ARGS="
     --bf16 True \
     --output_dir gs://weiyang2/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy no \
     --save_strategy steps \
     --save_steps 1000 \
     --save_total_limit 1 \
-    --learning_rate 4e-5 \
+    --learning_rate 2e-7 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type cosine \
@@ -97,7 +97,7 @@ TRAIN_ARGS="
     --run_name $CKPT_NAME \
     --fsdp full_shard \
     --fsdp_config fsdp_config.json \
-    --dpo False \
+    --dpo True \
     --noise_level [0,50] \
 "
 
