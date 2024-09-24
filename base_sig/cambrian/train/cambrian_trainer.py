@@ -814,7 +814,7 @@ class CambrianTrainer(Trainer):
                 best_log_prob,
                 worst_log_prob,
                 beta=1,
-                gamma=0
+                gamma=0.05
             )
     
         total_simpo_loss = losses.mean()
