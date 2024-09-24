@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-dpo-4e-5x0.4"
+export CKPT_NAME="cambrian-8b-finetune-llm-base-posttrain-737k-dpo-2e-7-new-proj-llm-on-vision-on"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -68,8 +68,6 @@ TRAIN_ARGS="
     --unfreeze_mm_vision_tower True \
     --freeze_backbone False \
     --mm_vision_tower_lr 4e-5 \
-    --mm_projector_lr 4e-5 \
-    --tune_mm_projector False \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
@@ -78,14 +76,14 @@ TRAIN_ARGS="
     --bf16 True \
     --output_dir gs://weiyang2/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy no \
     --save_strategy steps \
     --save_steps 1000 \
     --save_total_limit 1 \
-    --learning_rate 12e-6 \
+    --learning_rate 2e-7 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type cosine \
