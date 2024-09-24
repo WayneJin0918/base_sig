@@ -61,7 +61,7 @@ TRAIN_ARGS="
     --image_position 91 \
     --vision_hidden_size 1024 \
     --connector_only False \
-    --num_of_vision_sampler_layers 10 \
+    --num_of_vision_sampler_layers 5 \
     --start_of_vision_sampler_layers 0 \
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
@@ -76,8 +76,8 @@ TRAIN_ARGS="
     --bf16 True \
     --output_dir gs://weiyang2/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy no \
     --save_strategy steps \
