@@ -30,7 +30,7 @@ export WANDB_NAME=$exp_name
 
 # Default values
 
-resume="gs://weiyang2/cambrian-8b-finetune-llm-dpo-posttrain-737k-dpo-2e-7-llm-on-vision-on-new-proj"
+resume=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
