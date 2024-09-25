@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 TRAIN_ARGS="
-    --model_name_or_path /home/wayneyjin/ckpt/cambrian-sig-8b \
+    --model_name_or_path /home/wayneyjin/weights-ils \
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian737k.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
