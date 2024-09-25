@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 TRAIN_ARGS="
-    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/cambrian_ckpts/llama3ckpts \
+    --model_name_or_path /home/wayneyjin/weiyangrl-bucket/cambrian/cambrian-8b \
     --version llama_v3 \
     --data_path /home/wayneyjin/ckpt/Cambrian7M_withsystemprompt.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
