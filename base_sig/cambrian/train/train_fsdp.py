@@ -1639,11 +1639,23 @@ def train(INDEX, attn_implementation=None):
         )
     model.config.use_cache = False
     model.generation_config.do_sample = True
+
+    freeze_weights = [
+        "model.layers.31.input_layernorm.weight",
+        "model.layers.31.mlp.down_proj.weight",
+        "model.layers.31.mlp.gate_proj.weight",
+        "model.layers.31.mlp.up_proj.weight",
+        "model.layers.31.post_attention_layernorm.weight",
+        "lm_head.weight"
+    ]
     
-    model.requires_grad_(False)
-    model.model.requires_grad_(True)
+    for name, param in model.named_parameters():
+        if name in freeze_weights:
+            print_rank0('freezing {}'.format(name))
+            param.requires_grad = False
+            
     if model_args.freeze_backbone:
-        model.model.requires_grad_(False)
+        model.requires_grad_(False)
 
     log_rank0("Model loaded.")
 
