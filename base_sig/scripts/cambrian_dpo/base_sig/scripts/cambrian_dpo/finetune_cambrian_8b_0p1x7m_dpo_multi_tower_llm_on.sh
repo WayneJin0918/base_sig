@@ -66,8 +66,7 @@ TRAIN_ARGS="
     --stride_of_vision_sampler_layers 3 \
     --mm_projector_type sva \
     --unfreeze_mm_vision_tower False \
-    --tune_mm_projector True \
-    --mm_projector_lr 4e-5 \
+    --tune_mm_projector False \
     --freeze_backbone False \
     --mm_vision_tower_lr 4e-5 \
     --mm_vision_select_layer -2 \
