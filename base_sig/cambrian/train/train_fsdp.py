@@ -86,6 +86,7 @@ class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
     version: Optional[str] = field(default="v0")
     freeze_backbone: bool = field(default=False)
+    tune_llm_self_attention_only: bool = field(default=True)
     tune_mm_mlp_adapter: bool = field(default=False)
     vision_tower: Optional[str] = field(default=None)
     vision_tower_aux_list: Optional[str] = field(default=None)
@@ -1639,20 +1640,21 @@ def train(INDEX, attn_implementation=None):
         )
     model.config.use_cache = False
     model.generation_config.do_sample = True
-
-    freeze_weights = [
-        "model.layers.31.input_layernorm.weight",
-        "model.layers.31.mlp.down_proj.weight",
-        "model.layers.31.mlp.gate_proj.weight",
-        "model.layers.31.mlp.up_proj.weight",
-        "model.layers.31.post_attention_layernorm.weight",
-        "lm_head.weight"
-    ]
     
-    for name, param in model.named_parameters():
-        if name in freeze_weights:
-            print_rank0('freezing {}'.format(name))
-            param.requires_grad = False
+    if model_args.tune_llm_self_attention_only:
+        freeze_weights = [
+            "input_layernorm",
+            "mlp.down_proj",
+            "mlp.gate_proj",
+            "mlp.up_proj",
+            "post_attention_layernorm",
+            "lm_head.weight"
+        ]
+        
+        for name, param in model.named_parameters():
+            if name in freeze_weights:
+                print_rank0('freezing {}'.format(name))
+                param.requires_grad = False
             
     if model_args.freeze_backbone:
         model.requires_grad_(False)
