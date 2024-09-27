@@ -51,7 +51,7 @@ TRAIN_ARGS="
     --version llama_v3 \
     --data_path /home/wayneyjin/Cambrian737k.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/finetune_data \
-    --pretrain_mm_mlp_adapter /home/wayneyjin/projector/ils_mm_projector.pth \
+    --pretrain_mm_mlp_adapter /home/wayneyjin/projector/mm_projector.pth \
     --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
     --vision_tower_aux_token_len_list [576] \
     --image_token_len 576 \
