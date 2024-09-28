@@ -84,7 +84,7 @@ TRAIN_ARGS="
     --save_strategy steps \
     --save_steps 500 \
     --save_total_limit 1 \
-    --learning_rate 4e-6 \
+    --learning_rate 6e-7 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type cosine \
