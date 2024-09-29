@@ -100,7 +100,7 @@ TRAIN_ARGS="
     --fsdp_config fsdp_config.json \
     --dpo True \
     --noise_level [0,75] \
-    --noise_type random_mask
+    --noise_type random_mask \
 "
 
 if [ -n "$resume" ]; then
