@@ -178,7 +178,7 @@ class TrainingArguments(transformers.TrainingArguments):
     # for dpo training
     dpo: bool = False
     noise_level: Optional[str] = "[0, 50]"
-
+    noise_type: Optional[str] = "gaussian"
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
     from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
@@ -914,14 +914,57 @@ def preprocess(
     return dict(input_ids=input_ids, labels=targets)
 
 
-def add_noise_to_images(image: Image.Image, noise_levels: List[float], block_size: int = 16) -> List[tuple[Image.Image, float]]:
+# def add_noise_to_images(image: Image.Image, noise_levels: List[float], block_size: int = 16) -> List[tuple[Image.Image, float]]:
+#     noisy_images = []
+#     for noise_level in noise_levels:
+#         radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
+#         blurred_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
+#         mixed_image = mixup_images(image, blurred_image, noise_level, block_size=block_size)
+#         noisy_images.append(mixed_image)
+#     return noisy_images
+
+from PIL import Image, ImageFilter
+import numpy as np
+from typing import List
+
+def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str) -> List[tuple[Image.Image, float]]:
     noisy_images = []
+    
     for noise_level in noise_levels:
-        radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
-        blurred_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
-        mixed_image = mixup_images(image, blurred_image, noise_level, block_size=block_size)
-        noisy_images.append(mixed_image)
+        if noise_type == 'gaussian':
+            radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
+            noisy_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
+        elif noise_type == 'salt_and_pepper':
+            noisy_image = add_salt_and_pepper_noise(image, noise_level)
+        elif noise_type == 'random_mask':
+            noisy_image = apply_random_mask(image, noise_level)
+        else:
+            raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', or 'random_mask'.")
+        
+        noisy_images.append((noisy_image, noise_level))
+        
     return noisy_images
+
+def add_salt_and_pepper_noise(image: Image.Image, noise_level: float) -> Image.Image:
+    img_array = np.array(image)
+    prob = noise_level / 100
+
+    noisy = np.random.rand(*img_array.shape[:2])
+    img_array[noisy < prob / 2] = 0  # 盐噪声
+    img_array[noisy > 1 - prob / 2] = 255  # 胡椒噪声
+
+    return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
+
+def apply_random_mask(image: Image.Image, noise_level: float) -> Image.Image:
+    img_array = np.array(image)
+    mask_size = int((noise_level / 100) * img_array.shape[0] * img_array.shape[1])
+    for _ in range(mask_size):
+        x1 = random.randint(0, img_array.shape[1] - 1)
+        y1 = random.randint(0, img_array.shape[0] - 1)
+        x2 = min(x1 + 5, img_array.shape[1])
+        y2 = min(y1 + 5, img_array.shape[0])
+        img_array[y1:y2, x1:x2] = 0  # 置为黑色
+    return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
 
 def mixup_images(original: Image.Image, blurred: Image.Image, noise_level: float, block_size: int = 16) -> List[tuple[Image.Image, float]]:
         width, height = original.size
@@ -1054,7 +1097,7 @@ class LazySupervisedDataset(Dataset):
                     image_aux = processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0]
                     image_aux_list.append(image_aux)
                 else:
-                    image_auxs = add_noise_to_images(image, self.data_args.noise_level)
+                    image_auxs = add_noise_to_images(image, self.data_args.noise_level, self.data_args.noise_type)
                     image_auxs = torch.stack([processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0] for image_aux in image_auxs])
                     image_aux_list.append(image_auxs)
 
@@ -1486,9 +1529,10 @@ def train(INDEX, attn_implementation=None):
     
     if training_args.dpo:
         training_args.noise_level = json.loads(training_args.noise_level)
+        training_args.noise_type = json.loads(training_args.noise_type)
     data_args.dpo = training_args.dpo
     data_args.noise_level = training_args.noise_level
-    
+    data_args.noise_type = training_args.noise_type
     local_rank = training_args.local_rank
     # compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     compute_dtype = None
