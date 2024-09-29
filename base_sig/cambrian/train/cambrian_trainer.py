@@ -267,14 +267,13 @@ class CambrianTrainer(Trainer):
 
         with self.compute_loss_context_manager():
             if self.args.dpo:
-                # outputs = model(**inputs)
-                # logits = outputs.logits
-                # labels = inputs['labels']
-                # # print(labels.size(),"label")
-                # # print(logits.size(),"logits")
-                # log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
-                # loss = self.compute_loss_dpo(log_prob)
-                loss = self.compute_loss(model, inputs)
+                outputs = model(**inputs)
+                logits = outputs.logits
+                labels = inputs['labels']
+                # print(labels.size(),"label")
+                # print(logits.size(),"logits")
+                log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+                loss = self.compute_loss_dpo(log_prob)
             else:
                 loss = self.compute_loss(model, inputs)
 
