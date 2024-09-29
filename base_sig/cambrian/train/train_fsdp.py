@@ -1268,7 +1268,6 @@ class DataCollatorForSupervisedDataset(object):
     image_position: int
     dpo: bool
     noise_level: list
-    noise_type: list
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
 
         image_token_len = self.image_token_len
@@ -1530,7 +1529,6 @@ def train(INDEX, attn_implementation=None):
     
     if training_args.dpo:
         training_args.noise_level = json.loads(training_args.noise_level)
-        training_args.noise_type = json.loads(training_args.noise_type)
     data_args.dpo = training_args.dpo
     data_args.noise_level = training_args.noise_level
     data_args.noise_type = training_args.noise_type
