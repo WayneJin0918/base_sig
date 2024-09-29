@@ -179,6 +179,7 @@ class TrainingArguments(transformers.TrainingArguments):
     dpo: bool = False
     noise_level: Optional[str] = "[0, 50]"
     noise_type: Optional[str] = "gaussian"
+    
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
     from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
@@ -1267,7 +1268,7 @@ class DataCollatorForSupervisedDataset(object):
     image_position: int
     dpo: bool
     noise_level: list
-
+    noise_type: list
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
 
         image_token_len = self.image_token_len
@@ -1373,7 +1374,7 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
     
     data_collator_kwargs['dpo'] = data_args.dpo
     data_collator_kwargs['noise_level'] = data_args.noise_level
-
+    data_collator_kwargs['noise_type'] = data_args.noise_type
     data_collator = DataCollatorForSupervisedDataset(**data_collator_kwargs)
 
     return dict(train_dataset=train_dataset,
