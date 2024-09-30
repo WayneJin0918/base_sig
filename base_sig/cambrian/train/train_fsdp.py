@@ -942,7 +942,7 @@ def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_typ
         else:
             raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', or 'random_mask'.")
         
-        noisy_images.append((noisy_image, noise_level))
+        noisy_images.append(noisy_image)
         
     return noisy_images
 
@@ -951,8 +951,8 @@ def add_salt_and_pepper_noise(image: Image.Image, noise_level: float) -> Image.I
     prob = noise_level / 100
 
     noisy = np.random.rand(*img_array.shape[:2])
-    img_array[noisy < prob / 2] = 0  # 盐噪声
-    img_array[noisy > 1 - prob / 2] = 255  # 胡椒噪声
+    img_array[noisy < prob / 2] = 0  
+    img_array[noisy > 1 - prob / 2] = 255  
 
     return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
 
@@ -964,7 +964,7 @@ def apply_random_mask(image: Image.Image, noise_level: float) -> Image.Image:
         y1 = random.randint(0, img_array.shape[0] - 1)
         x2 = min(x1 + 5, img_array.shape[1])
         y2 = min(y1 + 5, img_array.shape[0])
-        img_array[y1:y2, x1:x2] = 0  # 置为黑色
+        img_array[y1:y2, x1:x2] = 0  # 
     return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
 
 def mixup_images(original: Image.Image, blurred: Image.Image, noise_level: float, block_size: int = 16) -> List[tuple[Image.Image, float]]:
