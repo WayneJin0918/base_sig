@@ -932,11 +932,13 @@ def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_typ
     noisy_images = []
     
     for noise_level in noise_levels:
-        if noise_type == 'gaussian':
+        if noise_type == 'gaussian_blur':
             radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
             noisy_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
         elif noise_type == 'salt_and_pepper':
             noisy_image = add_salt_and_pepper_noise(image, noise_level)
+        elif noise_type == 'gaussian':
+            noisy_image = add_gaussian_noise(image, noise_level)
         elif noise_type == 'random_mask':
             noisy_image = apply_random_mask(image, noise_level)
         else:
@@ -955,6 +957,28 @@ def add_salt_and_pepper_noise(image: Image.Image, noise_level: float) -> Image.I
     img_array[noisy > 1 - prob / 2] = 255  
 
     return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
+
+def add_gaussian_noise(image: Image.Image, noise_level: float) -> Image.Image:
+    img_array = np.array(image)
+    mean = 0
+    normalized_noise_level = noise_level / 100
+    var = (normalized_noise_level * 255) ** 2
+    sigma = var**0.5
+    gauss = np.random.normal(mean, sigma, img_array.shape).astype(np.uint8)
+    noisy_img = img_array + gauss
+    return Image.fromarray(np.clip(noisy_img, 0, 255).astype(np.uint8))
+
+def apply_color_jitter(image: Image.Image, brightness: float, contrast: float, saturation: float) -> Image.Image:
+    enhancer = ImageEnhance.Brightness(image)
+    image = enhancer.enhance(brightness)
+    
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(contrast)
+    
+    enhancer = ImageEnhance.Color(image)
+    image = enhancer.enhance(saturation)
+    
+    return image
 
 def apply_random_mask(image: Image.Image, noise_level: float) -> Image.Image:
     img_array = np.array(image)
