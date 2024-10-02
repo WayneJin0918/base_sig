@@ -941,6 +941,12 @@ def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_typ
             noisy_image = add_gaussian_noise(image, noise_level)
         elif noise_type == 'random_mask':
             noisy_image = apply_random_mask(image, noise_level)
+        elif noise_type == 'poisson':
+            noisy_image = add_poisson_noise(image)
+        elif noise_type == 'speckle':
+            noisy_image = add_speckle_noise(image, noise_level)
+        elif noise_type == 'color_jitter':
+            noisy_image = apply_color_jitter(image, brightness=1.0 + noise_level/100, contrast=1.0 + noise_level/100, saturation=1.0 + noise_level/100)
         else:
             raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', or 'random_mask'.")
         
@@ -990,6 +996,19 @@ def apply_random_mask(image: Image.Image, noise_level: float) -> Image.Image:
         y2 = min(y1 + 5, img_array.shape[0])
         img_array[y1:y2, x1:x2] = 0  # 
     return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
+
+def add_poisson_noise(image: Image.Image) -> Image.Image:
+    """Apply Poisson noise."""
+    img_array = np.array(image).astype(np.float32)
+    noisy_img = np.random.poisson(img_array).astype(np.uint8)
+    return Image.fromarray(np.clip(noisy_img, 0, 255))
+
+def add_speckle_noise(image: Image.Image, noise_level: float) -> Image.Image:
+    """Apply speckle noise (multiplicative noise)."""
+    img_array = np.array(image).astype(np.float32) / 255.0
+    noise = np.random.randn(*img_array.shape) * noise_level / 100
+    noisy_img = img_array + img_array * noise
+    return Image.fromarray(np.clip(noisy_img * 255, 0, 255).astype(np.uint8))
 
 def mixup_images(original: Image.Image, blurred: Image.Image, noise_level: float, block_size: int = 16) -> List[tuple[Image.Image, float]]:
         width, height = original.size
