@@ -924,7 +924,7 @@ def preprocess(
 #         noisy_images.append(mixed_image)
 #     return noisy_images
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageEnhance
 import numpy as np
 from typing import List
 
