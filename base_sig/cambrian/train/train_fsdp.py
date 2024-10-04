@@ -928,32 +928,97 @@ from PIL import Image, ImageFilter, ImageEnhance
 import numpy as np
 from typing import List
 
+# def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str) -> List[tuple[Image.Image, float]]:
+#     noisy_images = []
+    
+#     for noise_level in noise_levels:
+#         if noise_type == 'gaussian_blur':
+#             radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
+#             noisy_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
+#         elif noise_type == 'salt_and_pepper':
+#             noisy_image = add_salt_and_pepper_noise(image, noise_level)
+#         elif noise_type == 'gaussian':
+#             noisy_image = add_gaussian_noise(image, noise_level)
+#         elif noise_type == 'random_mask':
+#             noisy_image = apply_random_mask(image, noise_level)
+#         elif noise_type == 'poisson':
+#             noisy_image = add_poisson_noise(image)
+#         elif noise_type == 'speckle':
+#             noisy_image = add_speckle_noise(image, noise_level)
+#         elif noise_type == 'color_jitter':
+#             noisy_image = apply_color_jitter(image, brightness=1.0 + noise_level/100, contrast=1.0 + noise_level/100, saturation=1.0 + noise_level/100)
+#         else:
+#             raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', or 'random_mask'.")
+        
+#         noisy_images.append(noisy_image)
+        
+#     return noisy_images
+
+import random
+
 def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str) -> List[tuple[Image.Image, float]]:
     noisy_images = []
-    
+    mix_probability = 0.2
     for noise_level in noise_levels:
-        if noise_type == 'gaussian_blur':
-            radius = random.uniform(0.7 * noise_level, 1.3 * noise_level)
-            noisy_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
-        elif noise_type == 'salt_and_pepper':
+        noise_type = random.choice(['gaussian_blur', 'salt_and_pepper', 'gaussian', 'random_mask', 'speckle'])
+        
+        if noise_type == 'salt_and_pepper':
             noisy_image = add_salt_and_pepper_noise(image, noise_level)
         elif noise_type == 'gaussian':
             noisy_image = add_gaussian_noise(image, noise_level)
         elif noise_type == 'random_mask':
             noisy_image = apply_random_mask(image, noise_level)
-        elif noise_type == 'poisson':
-            noisy_image = add_poisson_noise(image)
         elif noise_type == 'speckle':
             noisy_image = add_speckle_noise(image, noise_level)
-        elif noise_type == 'color_jitter':
-            noisy_image = apply_color_jitter(image, brightness=1.0 + noise_level/100, contrast=1.0 + noise_level/100, saturation=1.0 + noise_level/100)
         else:
             raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', or 'random_mask'.")
         
-        noisy_images.append(noisy_image)
-        
-    return noisy_images
+        if random.random() < mix_probability:
+            additional_noise_type = random.choice(['gaussian', 'salt_and_pepper', 'random_mask', 'speckle'])
+            if additional_noise_type == 'salt_and_pepper':
+                noisy_image = add_salt_and_pepper_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'gaussian':
+                noisy_image = add_gaussian_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'random_mask':
+                noisy_image = apply_random_mask(noisy_image, noise_level)
+            elif additional_noise_type == 'speckle':
+                noisy_image = add_speckle_noise(noisy_image, noise_level)
 
+        if random.random() < mix_probability:
+            additional_noise_type = random.choice(['gaussian', 'salt_and_pepper', 'random_mask', 'speckle'])
+            if additional_noise_type == 'salt_and_pepper':
+                noisy_image = add_salt_and_pepper_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'gaussian':
+                noisy_image = add_gaussian_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'random_mask':
+                noisy_image = apply_random_mask(noisy_image, noise_level)
+            elif additional_noise_type == 'speckle':
+                noisy_image = add_speckle_noise(noisy_image, noise_level)
+
+        if random.random() < mix_probability:
+            additional_noise_type = random.choice(['gaussian', 'salt_and_pepper', 'random_mask', 'speckle'])
+            if additional_noise_type == 'salt_and_pepper':
+                noisy_image = add_salt_and_pepper_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'gaussian':
+                noisy_image = add_gaussian_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'random_mask':
+                noisy_image = apply_random_mask(noisy_image, noise_level)
+            elif additional_noise_type == 'speckle':
+                noisy_image = add_speckle_noise(noisy_image, noise_level)
+                
+        if random.random() < mix_probability:
+            additional_noise_type = random.choice(['gaussian', 'salt_and_pepper', 'random_mask', 'speckle'])
+            if additional_noise_type == 'salt_and_pepper':
+                noisy_image = add_salt_and_pepper_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'gaussian':
+                noisy_image = add_gaussian_noise(noisy_image, noise_level)
+            elif additional_noise_type == 'random_mask':
+                noisy_image = apply_random_mask(noisy_image, noise_level)
+            elif additional_noise_type == 'speckle':
+                noisy_image = add_speckle_noise(noisy_image, noise_level)
+
+        noisy_images.append(noisy_image)
+    return noisy_images
 def add_salt_and_pepper_noise(image: Image.Image, noise_level: float) -> Image.Image:
     img_array = np.array(image)
     prob = noise_level / 100
