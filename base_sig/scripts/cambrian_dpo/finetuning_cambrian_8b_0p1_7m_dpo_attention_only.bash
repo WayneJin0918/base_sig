@@ -100,7 +100,7 @@ TRAIN_ARGS="
     --fsdp_config fsdp_config.json \
     --dpo True \
     --noise_level [0,25] \
-    --noise_type color_jitter \
+    --noise_type salt_and_pepper \
 "
 
 if [ -n "$resume" ]; then
