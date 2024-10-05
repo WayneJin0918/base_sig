@@ -30,7 +30,7 @@ export WANDB_NAME=$exp_name
 
 # Default values
 
-resume=""
+resume="/home/wayneyjin/cambrian-8b-finetune-llm-dpo-posttrain-0p1-7m-dpo-7e-7-l-on-v-on-new-proj-random-25-0.2/checkpoint-1000"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
