@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-dpo-posttrain-0p1-7m-dpo-7e-7-l-on-v-on-new-proj-random-25-0.2"
+export CKPT_NAME="cambrian-8b-finetune-llm-dpo-posttrain-0p1-7m-dpo-7e-7-l-on-v-on-new-proj-random-75-0.2"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -30,7 +30,7 @@ export WANDB_NAME=$exp_name
 
 # Default values
 
-resume="/home/wayneyjin/cambrian-8b-finetune-llm-dpo-posttrain-0p1-7m-dpo-7e-7-l-on-v-on-new-proj-random-25-0.2/checkpoint-1000"
+resume=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -99,7 +99,7 @@ TRAIN_ARGS="
     --fsdp full_shard \
     --fsdp_config fsdp_config.json \
     --dpo True \
-    --noise_level [0,25] \
+    --noise_level [0,75] \
     --noise_type salt_and_pepper \
 "
 
