@@ -179,6 +179,7 @@ class TrainingArguments(transformers.TrainingArguments):
     dpo: bool = False
     noise_level: Optional[str] = "[0, 50]"
     noise_type: Optional[str] = "gaussian"
+    mix_probability: Optional[float] = 0.4
     
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
@@ -956,7 +957,7 @@ from typing import List
 
 import random
 
-def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str) -> List[tuple[Image.Image, float]]:
+def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str, mix_probability: float) -> List[tuple[Image.Image, float]]:
     noisy_images = []
     mix_probability = 0.3
     for noise_level in noise_levels:
@@ -1206,7 +1207,7 @@ class LazySupervisedDataset(Dataset):
                     image_aux = processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0]
                     image_aux_list.append(image_aux)
                 else:
-                    image_auxs = add_noise_to_images(image, self.data_args.noise_level, self.data_args.noise_type)
+                    image_auxs = add_noise_to_images(image, self.data_args.noise_level, self.data_args.noise_type, self.data_args.mix_probability)
                     image_auxs = torch.stack([processor_aux.preprocess(image_aux, return_tensors='pt')['pixel_values'][0] for image_aux in image_auxs])
                     image_aux_list.append(image_auxs)
 
@@ -1377,6 +1378,7 @@ class DataCollatorForSupervisedDataset(object):
     dpo: bool
     noise_level: list
     noise_type: str
+    mix_probability: float
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
 
         image_token_len = self.image_token_len
@@ -1483,6 +1485,7 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
     data_collator_kwargs['dpo'] = data_args.dpo
     data_collator_kwargs['noise_level'] = data_args.noise_level
     data_collator_kwargs['noise_type'] = data_args.noise_type
+    data_collator_kwargs['mix_probability'] =  data_args.mix_probability
     data_collator = DataCollatorForSupervisedDataset(**data_collator_kwargs)
 
     return dict(train_dataset=train_dataset,
@@ -1641,6 +1644,7 @@ def train(INDEX, attn_implementation=None):
     data_args.dpo = training_args.dpo
     data_args.noise_level = training_args.noise_level
     data_args.noise_type = training_args.noise_type
+    data_args.mix_probability = training_args.mix_probability
     local_rank = training_args.local_rank
     # compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     compute_dtype = None
