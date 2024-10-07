@@ -958,9 +958,9 @@ import random
 
 def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str) -> List[tuple[Image.Image, float]]:
     noisy_images = []
-    mix_probability = 0.2
+    mix_probability = 0.3
     for noise_level in noise_levels:
-        noise_type = random.choice(['salt_and_pepper', 'gaussian', 'random_mask', 'speckle'])
+        noise_type = random.choice(['salt_and_pepper'])
         
         if noise_type == 'salt_and_pepper':
             noisy_image = add_salt_and_pepper_noise(image, noise_level)
