@@ -101,6 +101,7 @@ TRAIN_ARGS="
     --dpo True \
     --noise_level [0,25] \
     --noise_type salt_and_pepper \
+    --mix_probability 0.4 \
 "
 
 if [ -n "$resume" ]; then
