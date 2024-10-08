@@ -177,6 +177,7 @@ class TrainingArguments(transformers.TrainingArguments):
     
     # for dpo training
     dpo: bool = False
+    beta: Optional[float] = 0.8
     noise_level: Optional[str] = "[0, 50]"
     noise_type: Optional[str] = "gaussian"
     
@@ -1310,6 +1311,7 @@ class DataCollatorForSupervisedDataset(object):
     image_aux_token_len_list: list
     image_position: int
     dpo: bool
+    beta : float
     noise_level: list
     noise_type: str
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
@@ -1416,6 +1418,7 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
         data_collator_kwargs['image_position'] = data_args.image_position
     
     data_collator_kwargs['dpo'] = data_args.dpo
+    data_collator_kwargs['beta'] = data_args.beta
     data_collator_kwargs['noise_level'] = data_args.noise_level
     data_collator_kwargs['noise_type'] = data_args.noise_type
     data_collator = DataCollatorForSupervisedDataset(**data_collator_kwargs)
@@ -1574,6 +1577,7 @@ def train(INDEX, attn_implementation=None):
     if training_args.dpo:
         training_args.noise_level = json.loads(training_args.noise_level)
     data_args.dpo = training_args.dpo
+    data_args.beta = training_args.beta
     data_args.noise_level = training_args.noise_level
     data_args.noise_type = training_args.noise_type
     local_rank = training_args.local_rank
