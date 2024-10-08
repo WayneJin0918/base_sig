@@ -820,8 +820,8 @@ class CambrianTrainer(Trainer):
         log_prob = log_prob.view(num_groups, group_size)
         best_log_prob = log_prob[:, 0]
         worst_log_prob = log_prob[:, 1]
-        print(best_log_prob)
-        print(worst_log_prob)
+        # print(best_log_prob)
+        # print(worst_log_prob)
         losses = self.simpo_loss_co(
                 best_log_prob,
                 worst_log_prob,
