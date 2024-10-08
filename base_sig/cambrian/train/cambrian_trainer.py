@@ -272,8 +272,9 @@ class CambrianTrainer(Trainer):
                 labels = inputs['labels']
                 # print(labels.size(),"label")
                 # print(logits.size(),"logits")
+                beta = self.args.beta
                 log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
-                loss = self.compute_loss_dpo(log_prob)
+                loss = self.compute_loss_dpo(log_prob, beta)
             else:
                 loss = self.compute_loss(model, inputs)
 
@@ -809,7 +810,7 @@ class CambrianTrainer(Trainer):
         
         return losses
     
-    def compute_loss_dpo(self, log_prob, return_outputs=False):
+    def compute_loss_dpo(self, log_prob, beta, return_outputs=False):
 
         log_prob = log_prob
     
@@ -825,7 +826,7 @@ class CambrianTrainer(Trainer):
         losses = self.simpo_loss_co(
                 best_log_prob,
                 worst_log_prob,
-                beta=0.9,
+                beta=beta,
                 gamma=0
             )
     
