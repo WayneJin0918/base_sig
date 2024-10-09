@@ -1794,23 +1794,23 @@ def train(INDEX, attn_implementation=None):
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
-    model.config.use_cache = False
-    model.generation_config.do_sample = True
+    # model.config.use_cache = False
+    # model.generation_config.do_sample = True
     
-    if model_args.tune_llm_self_attention_only:
-        freeze_weights = [
-            "input_layernorm",
-            "mlp.down_proj",
-            "mlp.gate_proj",
-            "mlp.up_proj",
-            "post_attention_layernorm",
-            "lm_head.weight"
-        ]
+    # if model_args.tune_llm_self_attention_only:
+    #     freeze_weights = [
+    #         "input_layernorm",
+    #         "mlp.down_proj",
+    #         "mlp.gate_proj",
+    #         "mlp.up_proj",
+    #         "post_attention_layernorm",
+    #         "lm_head.weight"
+    #     ]
         
-        for name, param in model.named_parameters():
-            if name in freeze_weights:
-                print_rank0('freezing {}'.format(name))
-                param.requires_grad = False
+    #     for name, param in model.named_parameters():
+    #         if name in freeze_weights:
+    #             print_rank0('freezing {}'.format(name))
+    #             param.requires_grad = False
             
     if model_args.freeze_backbone:
         model.requires_grad_(False)
