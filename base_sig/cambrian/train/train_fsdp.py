@@ -1794,23 +1794,23 @@ def train(INDEX, attn_implementation=None):
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
-    # model.config.use_cache = False
-    # model.generation_config.do_sample = True
+    model.config.use_cache = False
+    model.generation_config.do_sample = True
     
-    # if model_args.tune_llm_self_attention_only:
-    #     freeze_weights = [
-    #         "input_layernorm",
-    #         "mlp.down_proj",
-    #         "mlp.gate_proj",
-    #         "mlp.up_proj",
-    #         "post_attention_layernorm",
-    #         "lm_head.weight"
-    #     ]
+    if model_args.tune_llm_self_attention_only:
+        freeze_weights = [
+            "input_layernorm",
+            "mlp.down_proj",
+            "mlp.gate_proj",
+            "mlp.up_proj",
+            "post_attention_layernorm",
+            "lm_head.weight"
+        ]
         
-    #     for name, param in model.named_parameters():
-    #         if name in freeze_weights:
-    #             print_rank0('freezing {}'.format(name))
-    #             param.requires_grad = False
+        for name, param in model.named_parameters():
+            if name in freeze_weights:
+                print_rank0('freezing {}'.format(name))
+                param.requires_grad = False
             
     if model_args.freeze_backbone:
         model.requires_grad_(False)
@@ -1823,15 +1823,15 @@ def train(INDEX, attn_implementation=None):
             torch.float32 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=training_args.gradient_checkpointing)
 
-    # if training_args.gradient_checkpointing:
-    #     log_rank0("Using gradient checkpointing")
-    #     if hasattr(model, "enable_input_require_grads"):
-    #         model.enable_input_require_grads()
-    #     else:
-    #         def make_inputs_require_grad(module, input, output):
-    #             output.requires_grad_(True)
+    if training_args.gradient_checkpointing:
+        log_rank0("Using gradient checkpointing")
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
 
-    #         model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
     if training_args.lora_enable:
         log_rank0("Adding LoRA adapters...")
