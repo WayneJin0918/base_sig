@@ -30,29 +30,20 @@ export WANDB_NAME=$exp_name
 
 # Default values
 
-resume=""
+#!/bin/bash
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --resume)
-        resume="$2"
-        shift 2
-        ;;
-    *)
-        echo "Unknown argument: $1"
-        exit 1
-        ;;
-  esac
-done
-
-TRAIN_ARGS="
+export PJRT_DEVICE=TPU &&
+export XLA_USE_BF16=0 &&
+export WANDB_RESUME="allow" &&
+export CKPT_NAME="cambrian-34b-pretrain" &&
+export resume=""
+python cambrian/train/train_tpu.py \
     --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Nous-Hermes-2-Yi-34B \
     --version chatml_direct \
     --data_path /home/wayneyjin/alignment_2.5m.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/pretrain_data \
-    --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
-    --vision_tower_aux_token_len_list [576] \
+    --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
+    --vision_tower_aux_token_len_list '[576]' \
     --image_token_len 576 \
     --num_query_group 1 \
     --query_num_list '[576]' \
@@ -93,21 +84,8 @@ TRAIN_ARGS="
     --report_to wandb \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json
-    --dpo False \
-"
-
-if [ -n "$resume" ]; then
-    TRAIN_ARGS="$TRAIN_ARGS \
-        --train_continue True \
-        --resume_from_checkpoint $resume \
-    "
-fi
-
-echo $TRAIN_ARGS
-
-python cambrian/train/train_tpu.py \
-    $TRAIN_ARGS
+    --fsdp_config fsdp_config.json \
+    --resume_from_checkpoint $resume \
 
 CKPT_PATH=checkpoints/$CKPT_NAME
 # check if the checkpoint path exists
