@@ -1,11 +1,52 @@
-#!/bin/bash
 
-export PJRT_DEVICE=TPU &&
-export XLA_USE_BF16=0 &&
-export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-34b-pretrain" &&
+export PJRT_DEVICE=TPU
+export XLA_USE_BF16=1
+# export XLA_USE_BF16=0 &&
+# export WANDB_RESUME="allow" &&
+export CKPT_NAME="cambrian-34b-pretrain"
+# export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
-python cambrian/train/train_tpu.py \
+export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
+
+# debug flags
+if [ "$LLAVA_DEBUG" = "1" ]; then
+    echo  "Use debug setups."
+    export TPU_PROCESS_BOUNDS=1,1,1
+    export TPU_VISIBLE_CHIPS=0
+    num_workers=0
+    export WANDB_MODE=disabled
+fi
+
+exp_name=cambrian_post_training_737k_ils_test
+
+export WANDB_API_KEY="43161fa0733b631782a2d30b3bd8e9b5e8e0d482"
+export WANDB_ENTITY=nyu-visionx
+export WANDB_DISABLE_CODE="true"
+export WANDB_IGNORE_GLOBS="*.patch"
+export WANDB_PROJECT=Cambrian-DPO
+export WANDB_NAME=$exp_name
+
+# export WANDB_MODE="disabled"
+
+# Default values
+
+resume=""
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --resume)
+        resume="$2"
+        shift 2
+        ;;
+    *)
+        echo "Unknown argument: $1"
+        exit 1
+        ;;
+  esac
+done
+
+TRAIN_ARGS="
     --model_name_or_path /home/wayneyjin/weiyangrl-bucket/llm_ckpts/Nous-Hermes-2-Yi-34B \
     --version chatml_direct \
     --data_path /home/wayneyjin/alignment_2.5m.jsonl \
@@ -53,7 +94,20 @@ python cambrian/train/train_tpu.py \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json
+    --dpo False \
+"
 
+if [ -n "$resume" ]; then
+    TRAIN_ARGS="$TRAIN_ARGS \
+        --train_continue True \
+        --resume_from_checkpoint $resume \
+    "
+fi
+
+echo $TRAIN_ARGS
+
+python cambrian/train/train_tpu.py \
+    $TRAIN_ARGS
 
 CKPT_PATH=checkpoints/$CKPT_NAME
 # check if the checkpoint path exists
