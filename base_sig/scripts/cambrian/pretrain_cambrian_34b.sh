@@ -51,8 +51,8 @@ TRAIN_ARGS="
     --version chatml_direct \
     --data_path /home/wayneyjin/alignment_2.5m.jsonl \
     --image_folder /home/wayneyjin/weiyangrl-bucket/data/pretrain_data \
-    --vision_tower_aux_list '["siglip/CLIP-ViT-SO400M-14-384"]' \
-    --vision_tower_aux_token_len_list '[576]' \
+    --vision_tower_aux_list [\"siglip/CLIP-ViT-SO400M-14-384\"] \
+    --vision_tower_aux_token_len_list [576] \
     --image_token_len 576 \
     --num_query_group 1 \
     --query_num_list '[576]' \
