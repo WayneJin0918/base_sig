@@ -85,7 +85,6 @@ python cambrian/train/train_tpu.py \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json \
-    --resume_from_checkpoint $resume \
 
 CKPT_PATH=checkpoints/$CKPT_NAME
 # check if the checkpoint path exists
