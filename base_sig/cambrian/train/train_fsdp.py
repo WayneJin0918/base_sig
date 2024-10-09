@@ -1730,10 +1730,9 @@ def train(INDEX, attn_implementation=None):
 
         # Determine if bfloat16 should be used based on the model's size
         use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
-
-        if "yi" in model_args.model_name_or_path.lower():
+        use_bfloat16 = True # for 34B training
+        if "test" in model_args.model_name_or_path.lower():
             use_bfloat16 = True
-
         elif "mistral" in model_name.lower():
             logger.warning(f"Vision tower, loading CambrianMistralForCausalLM: {model_args.model_name_or_path}")
 
