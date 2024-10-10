@@ -1002,13 +1002,13 @@ def apply_color_jitter(image: Image.Image, brightness: float, contrast: float, s
 
 def apply_random_mask(image: Image.Image, noise_level: float) -> Image.Image:
     img_array = np.array(image)
-    mask_size = int((noise_level / 100) * img_array.shape[0] * img_array.shape[1])
+    mask_size = int((noise_level / 100) * (img_array.shape[0] // 16) * (img_array.shape[1] // 16))
     for _ in range(mask_size):
-        x1 = random.randint(0, img_array.shape[1] - 1)
-        y1 = random.randint(0, img_array.shape[0] - 1)
-        x2 = min(x1 + 5, img_array.shape[1])
-        y2 = min(y1 + 5, img_array.shape[0])
-        img_array[y1:y2, x1:x2] = 0  # 
+        x1 = random.randint(0, 15) * 16
+        y1 = random.randint(0, 15) * 16
+        x2 = min(x1 + 16, img_array.shape[1])
+        y2 = min(y1 + 16, img_array.shape[0])
+        img_array[y1:y2, x1:x2] = 0
     return Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
 
 def add_poisson_noise(image: Image.Image) -> Image.Image:
