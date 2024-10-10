@@ -929,6 +929,11 @@ from PIL import Image, ImageFilter, ImageEnhance
 import numpy as np
 from typing import List
 
+import random
+import numpy as np
+from PIL import Image, ImageEnhance, ImageFilter
+from typing import List
+
 def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_type: str) -> List[tuple[Image.Image, float]]:
     noisy_images = []
     
@@ -948,8 +953,16 @@ def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_typ
             noisy_image = add_speckle_noise(image, noise_level)
         elif noise_type == 'color_jitter':
             noisy_image = apply_color_jitter(image, brightness=1.0 + noise_level/100, contrast=1.0 + noise_level/100, saturation=1.0 + noise_level/100)
+        elif noise_type == 'random_rotation':
+            noisy_image = random_rotation(image, noise_level)
+        elif noise_type == 'random_crop':
+            noisy_image = random_crop(image, noise_level)
+        elif noise_type == 'stretch':
+            noisy_image = random_stretch(image, noise_level)
+        elif noise_type == 'random_collage':
+            noisy_image = random_collage(image, noise_level)
         else:
-            raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', or 'random_mask'.")
+            raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', 'random_mask', 'poisson', 'speckle', 'color_jitter', 'random_rotation', 'random_crop', 'stretch', 'random_collage'.")
         
         noisy_images.append(noisy_image)
         
@@ -1010,6 +1023,49 @@ def add_speckle_noise(image: Image.Image, noise_level: float) -> Image.Image:
     noise = np.random.randn(*img_array.shape) * noise_level / 100
     noisy_img = img_array + img_array * noise
     return Image.fromarray(np.clip(noisy_img * 255, 0, 255).astype(np.uint8))
+
+def random_rotation(image: Image.Image, max_angle: float) -> Image.Image:
+    """Apply random rotation to the image."""
+    angle = random.uniform(-max_angle, max_angle)
+    return image.rotate(angle)
+
+def random_crop(image: Image.Image, crop_percentage: float) -> Image.Image:
+    """Apply random cropping to the image."""
+    img_width, img_height = image.size
+    crop_size = (int(img_width * (1 - crop_percentage / 100)), int(img_height * (1 - crop_percentage / 100)))
+    left = random.randint(0, img_width - crop_size[0])
+    top = random.randint(0, img_height - crop_size[1])
+    right = left + crop_size[0]
+    bottom = top + crop_size[1]
+    return image.crop((left, top, right, bottom)).resize((img_width, img_height))
+
+def random_stretch(image: Image.Image, stretch_level: float) -> Image.Image:
+    """Apply random stretching (scaling) to the image."""
+    img_width, img_height = image.size
+    new_width = int(img_width * (1 + random.uniform(-stretch_level / 100, stretch_level / 100)))
+    new_height = int(img_height * (1 + random.uniform(-stretch_level / 100, stretch_level / 100)))
+    return image.resize((new_width, new_height)).resize((img_width, img_height))
+
+def random_collage(image: Image.Image, noise_level: float) -> Image.Image:
+    """Apply random collage effect by stitching parts of the image in random order."""
+    img_width, img_height = image.size
+    collage_image = Image.new('RGB', (img_width, img_height))
+    num_pieces = int(noise_level / 10) + 1
+    piece_width = img_width // num_pieces
+    piece_height = img_height // num_pieces
+
+    for i in range(num_pieces):
+        for j in range(num_pieces):
+            left = j * piece_width
+            top = i * piece_height
+            right = min(left + piece_width, img_width)
+            bottom = min(top + piece_height, img_height)
+            piece = image.crop((left, top, right, bottom))
+            random_x = random.randint(0, num_pieces - 1) * piece_width
+            random_y = random.randint(0, num_pieces - 1) * piece_height
+            collage_image.paste(piece, (random_x, random_y))
+
+    return collage_image
 
 def mixup_images(original: Image.Image, blurred: Image.Image, noise_level: float, block_size: int = 16) -> List[tuple[Image.Image, float]]:
         width, height = original.size
