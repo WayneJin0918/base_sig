@@ -1026,7 +1026,7 @@ def add_speckle_noise(image: Image.Image, noise_level: float) -> Image.Image:
 
 def random_rotation(image: Image.Image, max_angle: float) -> Image.Image:
     """Apply random rotation to the image."""
-    angle = random.uniform(-max_angle, max_angle)
+    angle = random.uniform(-max_angle*3.6, max_angle*3.6)
     return image.rotate(angle)
 
 def random_crop(image: Image.Image, crop_percentage: float) -> Image.Image:
