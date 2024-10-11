@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-dpo-posttrain-0p1-7m-dpo-1e-5-l-on-v-on-new-proj-mask-25"
+export CKPT_NAME="cambrian-8b-finetune-llm-dpo-posttrain-0p1-7m-dpo-4e-6-l-on-v-on-new-proj-mask-25"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
