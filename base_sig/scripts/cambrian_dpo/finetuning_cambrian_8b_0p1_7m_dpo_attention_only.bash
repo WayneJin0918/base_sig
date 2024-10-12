@@ -100,8 +100,8 @@ TRAIN_ARGS="
     --fsdp_config fsdp_config.json \
     --dpo True \
     --beta 1 \
-    --noise_level [0,75] \
-    --noise_type salt_and_pepper \
+    --noise_level [0,25] \
+    --noise_type high_pass_filter \
 "
 
 if [ -n "$resume" ]; then
