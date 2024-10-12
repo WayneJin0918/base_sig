@@ -101,7 +101,7 @@ TRAIN_ARGS="
     --dpo True \
     --beta 1 \
     --noise_level [0,25] \
-    --noise_type high_pass_filter \
+    --noise_type random_collage \
 "
 
 if [ -n "$resume" ]; then
