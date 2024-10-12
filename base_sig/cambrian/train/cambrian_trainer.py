@@ -787,7 +787,41 @@ class CambrianTrainer(Trainer):
 
         log_prob = (per_token_logps * loss_mask).sum(-1)
         return log_prob
-
+    
+    def get_vision_p(self, logits: torch.FloatTensor, labels: torch.LongTensor = None) -> torch.FloatTensor:
+        """Compute the probabilities of the given vision features for labels that are equal to -200.
+    
+        Args:
+            logits: Vision features extracted by Vision Tower. Shape: (batch_size, num_features, vocab_size).
+            labels: Labels for which to compute the probabilities, similar to text labels. Shape: (batch_size, num_features), optional.
+    
+        Returns:
+            A tensor of shape (batch_size,) containing the average probabilities of the features where labels are equal to -200.
+        """
+        # Step 1: Normalize vision features to probabilities (using softmax)
+        vision_probs = torch.softmax(logits, dim=-1)  # Probabilities over the vocabulary size (last dimension)
+    
+        # Step 2: Create a mask for labels that are equal to -200
+        mask = (labels == -200)  # Shape: (batch_size, num_features)
+        
+        # Step 3: Clamp labels to a valid index (e.g., 0) to prevent indexing errors
+        clamped_labels = torch.clamp(labels, min=0)  # Replace -200 with 0 for safe indexing
+    
+        # Step 4: Gather the probabilities based on clamped labels
+        gathered_probs = torch.gather(vision_probs, dim=-1, index=clamped_labels.unsqueeze(-1)).squeeze(-1)
+    
+        # Step 5: Apply the mask to extract only the probabilities corresponding to -200 labels
+        selected_probs = gathered_probs * mask  # Masking unwanted values (they will be zeroed)
+    
+        # Step 6: Sum over the masked positions and calculate the average for each batch
+        sum_probs = torch.sum(selected_probs, dim=-1)  # Sum of probabilities for each instance in batch
+        count_valid = torch.sum(mask, dim=-1)  # Count the number of valid (masked as -200) positions per instance in batch
+    
+        # Avoid division by zero by adding epsilon where count is zero
+        average_probs = sum_probs / (count_valid + 1e-8)  # Avoid division by zero
+    
+        return average_probs
+    
     def simpo_loss(self, policy_chosen_logps: torch.FloatTensor,
                    policy_rejected_logps: torch.FloatTensor,
                    beta: float,
