@@ -961,12 +961,43 @@ def add_noise_to_images(image: Image.Image, noise_levels: List[float], noise_typ
             noisy_image = random_stretch(image, noise_level)
         elif noise_type == 'random_collage':
             noisy_image = random_collage(image, noise_level)
+        elif noise_type == 'low_pass_filter':
+            noisy_image = apply_low_pass_filter(image, noise_level)
+        elif noise_type == 'high_pass_filter':
+            noisy_image = apply_high_pass_filter(image, noise_level)
         else:
-            raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', 'random_mask', 'poisson', 'speckle', 'color_jitter', 'random_rotation', 'random_crop', 'stretch', 'random_collage'.")
+            raise ValueError("Invalid noise type. Choose from 'gaussian', 'salt_and_pepper', 'random_mask', 'poisson', 'speckle', 'color_jitter', 'random_rotation', 'random_crop', 'stretch', 'random_collage','low_pass_filter','high_pass_filter'.")
         
         noisy_images.append(noisy_image)
         
     return noisy_images
+
+def apply_high_pass_filter(image: Image.Image, noise_level: float) -> Image.Image:
+    """Apply a simplified high pass filter to remove low frequency components."""
+    # Apply a Gaussian blur to obtain low frequency components
+    radius = max(1, noise_level * 0.2)  # Radius proportional to noise_level, min value is 1
+    blurred_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
+
+    # Convert images to numpy arrays
+    original_array = np.array(image)
+    blurred_array = np.array(blurred_image)
+
+    # Subtract blurred (low frequency) image from original image to get high frequency components
+    high_pass_array = original_array - blurred_array
+
+    # Normalize the result to ensure values are in range [0, 255]
+    high_pass_array = np.clip(high_pass_array, 0, 255)
+
+    # Convert back to an image
+    high_pass_image = Image.fromarray(high_pass_array.astype(np.uint8))
+
+    return high_pass_image
+
+def apply_low_pass_filter(image: Image.Image, noise_level: float) -> Image.Image:
+    """Apply a low pass filter to reduce high frequency components."""
+    # Use Gaussian blur with a radius proportional to the noise_level
+    radius = max(1, noise_level * 0.2)  # Set minimum radius to 1 to ensure filter is applied
+    return image.filter(ImageFilter.GaussianBlur(radius=radius))
 
 def add_salt_and_pepper_noise(image: Image.Image, noise_level: float) -> Image.Image:
     img_array = np.array(image)
