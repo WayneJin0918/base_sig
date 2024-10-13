@@ -266,18 +266,18 @@ class CambrianTrainer(Trainer):
             return loss_mb.reduce_mean().detach().to(self.args.device)
 
         with self.compute_loss_context_manager():
-            # if self.args.dpo:
-            #     outputs = model(**inputs)
-            #     logits = outputs.logits
-            #     labels = inputs['labels']
-            #     # print(labels.size(),"label")
-            #     # print(logits.size(),"logits")
-            #     beta = self.args.beta
-            #     log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
-            #     loss = self.compute_loss_dpo(log_prob, beta)
-            # else:
-            #     loss = self.compute_loss(model, inputs)
-            loss = self.compute_loss(model, inputs)
+            if self.args.dpo:
+                outputs = model(**inputs)
+                logits = outputs.logits
+                labels = inputs['labels']
+                # print(labels.size(),"label")
+                # print(logits.size(),"logits")
+                beta = self.args.beta
+                log_prob = self.get_batch_logps(logits, labels, return_per_token_logp=False)
+                loss = self.compute_loss_dpo(log_prob, beta)
+            else:
+                loss = self.compute_loss(model, inputs)
+
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
