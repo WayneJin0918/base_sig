@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-finetune-posttrain-0p1-7m-dpo-2e-6-l-on-v-on-new-proj-hp-25"
+export CKPT_NAME="cambrian-8b-finetune-llm-posttrain-0p1-7m-dpo-2e-6-l-on-v-on-new-proj-hp-25"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -77,8 +77,8 @@ TRAIN_ARGS="
     --bf16 False \
     --output_dir gs://weiyang2/$CKPT_NAME \
     --num_train_epochs 0.1 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy no \
     --save_strategy steps \
@@ -100,7 +100,7 @@ TRAIN_ARGS="
     --fsdp_config fsdp_config.json \
     --dpo True \
     --beta 1 \
-    --noise_level [25] \
+    --noise_level [0,25] \
     --noise_type high_pass_filter \
 "
 
