@@ -98,7 +98,7 @@ TRAIN_ARGS="
     --run_name $CKPT_NAME \
     --fsdp full_shard \
     --fsdp_config fsdp_config.json \
-    --dpo False \
+    --dpo True \
     --beta 1 \
     --noise_level [25] \
     --noise_type high_pass_filter \
