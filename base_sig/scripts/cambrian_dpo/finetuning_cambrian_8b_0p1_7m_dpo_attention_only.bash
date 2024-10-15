@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export XLA_USE_BF16=0 &&
 # export WANDB_RESUME="allow" &&
-export CKPT_NAME="cambrian-8b-finetune-llm-posttrain-0p1-7m-dpo-1e-6-l-on-v-on-new-proj-rotation-75"
+export CKPT_NAME="cambrian-8b-finetune-llm-posttrain-0p1-7m-dpo-2e-6-l-on-v-on-new-proj-rotation-75"
 # export XLA_FLAGS="--xla_hlo_profile --xla_gpu_force_compilation_parallelism=1"
 
 export CKPT_DIR="$HOME/ckpt/$CKPT_NAME"
@@ -84,7 +84,7 @@ TRAIN_ARGS="
     --save_strategy steps \
     --save_steps 1000 \
     --save_total_limit 1 \
-    --learning_rate 1e-6 \
+    --learning_rate 2e-6 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type cosine \
