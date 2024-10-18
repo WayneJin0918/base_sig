@@ -16,7 +16,8 @@
 #    limitations under the License.
 
 import os
-os.environ.pop('TPU_PROCESS_ADDRESSES') os.environ.pop('CLOUD_TPU_TASK_ID')
+os.environ.pop('TPU_PROCESS_ADDRESSES') 
+os.environ.pop('CLOUD_TPU_TASK_ID')
 import re
 import re
 import copy
