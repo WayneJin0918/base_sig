@@ -12,7 +12,7 @@ from .midas_encoder import MiDaSVisionTower
 from .moco_encoder import MoCoVisionTower
 from .supervised_vit_encoder import SupervisedViT_VisionTower
 from .sam_encoder import SAMVisionTower
-from .diffusion_encoder import DiffusionVisionTower
+# from .diffusion_encoder import DiffusionVisionTower
 from .maws_encoder import MawsVisionTower
 
 
@@ -69,9 +69,9 @@ def load_vision_model(vision_tower_name: str, args, **kwargs):
         return SupervisedViT_VisionTower(vision_tower_name, args=args, **kwargs)
 
     # Other Vision Towers
-    if "diffusion" in vision_tower_name.lower():
-        logger.info(f"Loading **Diffusion CLIP** Vision Tower: {vision_tower_name}")
-        return DiffusionVisionTower(vision_tower_name, args=args, **kwargs)
+    # if "diffusion" in vision_tower_name.lower():
+    #     logger.info(f"Loading **Diffusion CLIP** Vision Tower: {vision_tower_name}")
+    #     return DiffusionVisionTower(vision_tower_name, args=args, **kwargs)
     if "midas" in vision_tower_name.lower():
         logger.info(f"Loading **MiDaS** Vision Tower: {vision_tower_name}")
         return MiDaSVisionTower(vision_tower_name, args=args, **kwargs)
