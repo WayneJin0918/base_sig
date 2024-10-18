@@ -1,5 +1,5 @@
 
-# export PJRT_DEVICE=TPU
+export PJRT_DEVICE=TPU
 export XLA_USE_BF16=1
 # export TPU_ACCELERATOR_TYPE=v4-256
 # export XLA_USE_BF16=0 &&
