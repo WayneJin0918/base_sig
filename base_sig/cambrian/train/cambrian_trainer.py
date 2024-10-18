@@ -833,13 +833,11 @@ class CambrianTrainer(Trainer):
         
         return losses
 
-    def simpo_loss_co(self, policy_chosen_logps: torch.FloatTensor,
+    def loss_co(self, policy_chosen_logps: torch.FloatTensor,
                    policy_rejected_logps: torch.FloatTensor,
                    beta: float,
                    gamma: float) -> torch.FloatTensor:
-        normalized_chosen_logps = policy_chosen_logps
-        normalized_rejected_logps = policy_rejected_logps
-        logits =  beta *normalized_chosen_logps - (2-beta) *normalized_rejected_logps
+        logits =  beta *policy_chosen_logps - (2-beta) *policy_rejected_logps
         losses = -F.logsigmoid(logits)
         
         return losses
@@ -857,7 +855,7 @@ class CambrianTrainer(Trainer):
         worst_log_prob = log_prob[:, 1]
         # print(best_log_prob)
         # print(worst_log_prob)
-        losses = self.simpo_loss_co(
+        losses = self.loss_co(
                 best_log_prob,
                 worst_log_prob,
                 beta=beta,
