@@ -18,16 +18,16 @@ if [ "$LLAVA_DEBUG" = "1" ]; then
     export WANDB_MODE=disabled
 fi
 
-exp_name=cambrian_post_training_737k_ils_test
+# exp_name=cambrian_post_training_737k_ils_test
 
-export WANDB_API_KEY="43161fa0733b631782a2d30b3bd8e9b5e8e0d482"
-export WANDB_ENTITY=nyu-visionx
-export WANDB_DISABLE_CODE="true"
-export WANDB_IGNORE_GLOBS="*.patch"
-export WANDB_PROJECT=Cambrian-DPO
-export WANDB_NAME=$exp_name
+# export WANDB_API_KEY="43161fa0733b631782a2d30b3bd8e9b5e8e0d482"
+# export WANDB_ENTITY=nyu-visionx
+# export WANDB_DISABLE_CODE="true"
+# export WANDB_IGNORE_GLOBS="*.patch"
+# export WANDB_PROJECT=Cambrian-DPO
+# export WANDB_NAME=$exp_name
 
-# export WANDB_MODE="disabled"
+export WANDB_MODE="disabled"
 
 # Default values
 
