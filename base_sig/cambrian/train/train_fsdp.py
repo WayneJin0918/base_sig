@@ -1528,10 +1528,21 @@ class DataCollatorForSupervisedDataset(object):
             #     attention_mask[i] = cur_attention_mask_tmp
         for i in range(len(input_ids)):
             if i % 2 == 1:
-                cur_attention_mask_tmp = attention_mask[i].clone()
-                cur_attention_mask_tmp[image_position:image_position + image_token_len] = False
-                attention_mask[i] = cur_attention_mask_tmp
-                print(attention_mask.size())
+                if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
+                    cur_input_ids_tmp = input_ids[i].clone()
+                    cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
+                    cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
+                    input_ids[i] = cur_input_ids_tmp
+                
+                    cur_labels_tmp = labels[i].clone()
+                    cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
+                    cur_labels_tmp[image_position] = IGNORE_INDEX
+                    labels[i] = cur_labels_tmp
+            
+                    cur_attention_mask_tmp = attention_mask[i].clone()
+                    cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
+                    cur_attention_mask_tmp[image_position:image_position + image_token_len] = False
+                    attention_mask[i] = cur_attention_mask_tmp
             else:
                 if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
                     cur_input_ids_tmp = input_ids[i].clone()
