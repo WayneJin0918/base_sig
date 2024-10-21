@@ -267,8 +267,6 @@ class CambrianTrainer(Trainer):
         indices_to_modify = indices[indices % 2 == 1]
 
         inputs['attention_mask'][indices_to_modify, :575] = 0
-        logger.info(f"Batch {batch_size} - Ignoring image attention mask for samples {indices_to_modify.tolist()}")
-        
         model.train()
         inputs = self._prepare_inputs(inputs)
 
