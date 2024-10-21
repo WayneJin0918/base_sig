@@ -14,7 +14,7 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from patch_metadata import patch_metadata
+from cambrian.train.patch_metadata import patch_metadata
 patch_metadata()
 import os
 # os.environ.pop('TPU_PROCESS_ADDRESSES') 
