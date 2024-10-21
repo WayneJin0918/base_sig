@@ -262,20 +262,17 @@ class CambrianTrainer(Trainer):
         model.train()
         inputs = self._prepare_inputs(inputs)
         image_position = getattr(self.args, 'image_position', None)
+        batch_size = inputs['attention_mask'].size(0)
         if image_position is None:
             raise ValueError("`image_position` must be set in `DataArguments` or `TrainingArguments`.")
 
-        if self.batch_idx % 2 == 1:
-            if 'attention_mask' in inputs:
-                inputs['attention_mask'][:, image_position:] = 0
-                logger.info(f"Batch {self.batch_idx} - Ignoring image attention mask")
+        indices = torch.arange(batch_size, device=device)
+        indices_to_modify = indices[indices % 2 == 1]
 
-            if 'labels' in inputs:
-                inputs['labels'][:, image_position:] = self.label_pad_token_id 
-                logger.info(f"Batch {self.batch_idx} - Ignoring image labels")
-        else:
-            logger.info(f"Batch {self.batch_idx} - Using original attention mask and labels")
-
+        # 修改 attention_mask 和 labels，保持形状不变
+        if indices_to_modify.numel() > 0:
+            inputs['attention_mask'][indices_to_modify, :image_position] = 0
+            logger.info(f"Batch {self.batch_idx} - Ignoring image attention mask for samples {indices_to_modify.tolist()}")
         
         model.train()
         inputs = self._prepare_inputs(inputs)
@@ -308,7 +305,7 @@ class CambrianTrainer(Trainer):
         selected_module_names = ['vision_tower']
         # if self.args.unfreeze_mm_vision_tower:
         #     reduce_gradients(self.optimizer, self.param_to_name, selected_module_names)
-        self.batch_idx += 1
+
         return loss.detach() / self.args.gradient_accumulation_steps
 
     def create_optimizer(self):
