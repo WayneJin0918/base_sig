@@ -265,9 +265,9 @@ class CambrianTrainer(Trainer):
         
         indices = torch.arange(batch_size).to(self.args.device)
         indices_to_modify = indices[indices % 2 == 1]
-        if indices_to_modify.numel() > 0:
-            inputs['attention_mask'][indices_to_modify, :575] = 0
-            logger.info(f"Batch {batch_size} - Ignoring image attention mask for samples {indices_to_modify.tolist()}")
+
+        inputs['attention_mask'][indices_to_modify, :575] = 0
+        logger.info(f"Batch {batch_size} - Ignoring image attention mask for samples {indices_to_modify.tolist()}")
         
         model.train()
         inputs = self._prepare_inputs(inputs)
