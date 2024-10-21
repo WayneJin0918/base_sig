@@ -261,17 +261,12 @@ class CambrianTrainer(Trainer):
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
         inputs = self._prepare_inputs(inputs)
-        image_position = getattr(self.args, 'image_position', None)
-        batch_size = inputs['attention_mask'].size(0)
-        if image_position is None:
-            raise ValueError("`image_position` must be set in `DataArguments` or `TrainingArguments`.")
-
+        batch_size = inputs['labels'].size(0)
+        
         indices = torch.arange(batch_size, device=device)
         indices_to_modify = indices[indices % 2 == 1]
-
-        # 修改 attention_mask 和 labels，保持形状不变
         if indices_to_modify.numel() > 0:
-            inputs['attention_mask'][indices_to_modify, :image_position] = 0
+            inputs['attention_mask'][indices_to_modify, :575] = 0
             logger.info(f"Batch {self.batch_idx} - Ignoring image attention mask for samples {indices_to_modify.tolist()}")
         
         model.train()
