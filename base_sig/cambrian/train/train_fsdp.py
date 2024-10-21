@@ -1531,6 +1531,7 @@ class DataCollatorForSupervisedDataset(object):
                 cur_attention_mask_tmp = attention_mask[i].clone()
                 cur_attention_mask_tmp[image_position:image_position + image_token_len] = False
                 attention_mask[i] = cur_attention_mask_tmp
+                print(attention_mask.size())
             else:
                 if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
                     cur_input_ids_tmp = input_ids[i].clone()
