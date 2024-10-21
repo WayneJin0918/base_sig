@@ -1311,89 +1311,6 @@ def prepare_image_info(image_size, image_token_len, newline=False):
     position_ids = attention_mask.cumsum(0)-1
     return attention_mask, position_ids
 
-def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len=576, image_aux_token_len_list=[192*192], max_length=2048):
-    input_ids_im_replaced = []
-    labels_im_replaced = []
-    attention_mask_im_replaced = []
-    position_ids_im_replaced = []
-    im_aux_attention_masks_list = [[] for _ in range(len(image_aux_token_len_list))]
-    base_image_token_len_per_side = int(image_token_len**0.5)
-    image_aux_token_len_per_side_list = [int(image_aux_token_len_per_side**0.5) for image_aux_token_len_per_side in image_aux_token_len_list]
-
-    for batch_idx, cur_input_ids in enumerate(input_ids):
-        num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
-        assert num_images == 1, num_images
-        image_size = image_sizes[batch_idx]
-        
-        image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
-
-        cur_input_ids_im_replaced = []
-        cur_labels_im_replaced = []
-        cur_attention_mask_im_replaced = []
-        cur_position_ids_im_replaced = []
-        
-        cur_labels = labels[batch_idx]
-        cur_attention_mask = attention_mask[batch_idx]
-        index = 0
-        for i in range(len(image_token_indices) - 1):
-            cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]+1])
-            cur_labels_im_replaced.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
-
-            if batch_idx % 2 == 0:
-                cur_attention_mask_im_replaced.append(torch.zeros_like(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]]))
-            else:
-                cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
-                
-            cur_position_ids_im_replaced.append(torch.arange(index, index + image_token_indices[i+1] - (image_token_indices[i] + 1), dtype=torch.long, device=cur_input_ids.device))
-            index += image_token_indices[i+1] - (image_token_indices[i] + 1)
-            
-            if i < len(image_token_indices) - 2:
-                num_tokens_per_side = int(image_token_len**0.5)
-                image_token_len_with_newline = image_token_len + num_tokens_per_side
-                cur_input_ids_im_replaced.append(torch.full((image_token_len_with_newline - 1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
-                cur_labels_im_replaced.append(torch.full((image_token_len_with_newline,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
-
-                cur_im_attention_mask, cur_im_position_ids = prepare_image_info(image_size, image_token_len, newline=True)
-
-                for aux_i, image_aux_token_len_per_side in enumerate(image_aux_token_len_per_side_list):
-                    assert image_aux_token_len_per_side >= base_image_token_len_per_side
-                    num_base_crops_per_aux_side = image_aux_token_len_per_side // base_image_token_len_per_side
-
-                    cur_im_aux_attention_mask, _ = prepare_image_info(image_size, image_aux_token_len_per_side**2)
-                    cur_im_aux_attention_mask = cur_im_aux_attention_mask.view(base_image_token_len_per_side, num_base_crops_per_aux_side, base_image_token_len_per_side, num_base_crops_per_aux_side)
-                    cur_im_aux_attention_mask = cur_im_aux_attention_mask.permute(0, 2, 1, 3).contiguous().flatten(0, 1).flatten(1, 2)
-                    cur_im_aux_attention_mask[cur_im_aux_attention_mask.sum(dim=1) == 0] = True
-                    im_aux_attention_masks_list[aux_i].append(cur_im_aux_attention_mask)
-                cur_im_position_ids += index
-                
-                if cur_attention_mask[image_token_indices[i + 1]]:
-                    cur_attention_mask_im_replaced.append(cur_im_attention_mask)
-                    cur_position_ids_im_replaced.append(cur_im_position_ids.to(torch.long))
-                    index = cur_im_position_ids.max() + 1
-                else:
-                    num_tokens_per_side = int(image_token_len**0.5)
-                    image_token_len_with_newline = image_token_len + num_tokens_per_side
-                    cur_attention_mask_im_replaced.append(torch.full((image_token_len_with_newline,), 0, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
-                    cur_position_ids_im_replaced.append(torch.full((image_token_len_with_newline,), 0, device=cur_input_ids.device, dtype=torch.long))
-        
-        input_ids_im_replaced.append(torch.cat(cur_input_ids_im_replaced))
-        labels_im_replaced.append(torch.cat(cur_labels_im_replaced))
-        attention_mask_im_replaced.append(torch.cat(cur_attention_mask_im_replaced))
-        position_ids_im_replaced.append(torch.cat(cur_position_ids_im_replaced))
-    
-    # Truncate sequences to max length
-    new_input_ids = [x[0:max_length] for x in input_ids_im_replaced]
-    new_labels = [x[0:max_length] for x in labels_im_replaced]
-    new_attention_mask = [x[0:max_length] for x in attention_mask_im_replaced]
-    new_position_ids = [x[0:max_length] for x in position_ids_im_replaced]
-    new_input_ids = torch.stack(new_input_ids)
-    new_labels = torch.stack(new_labels)
-    new_attention_mask = torch.stack(new_attention_mask)
-    new_position_ids = torch.stack(new_position_ids)
-    im_aux_attention_masks_list = [torch.stack(im_aux_attention_masks) for im_aux_attention_masks in im_aux_attention_masks_list]
-    return new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list
-
-
 # def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len=576, image_aux_token_len_list=[192*192], max_length=2048):
 #     input_ids_im_replaced = []
 #     labels_im_replaced = []
@@ -1402,7 +1319,7 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, imag
 #     im_aux_attention_masks_list = [[] for _ in range(len(image_aux_token_len_list))]
 #     base_image_token_len_per_side = int(image_token_len**0.5)
 #     image_aux_token_len_per_side_list = [int(image_aux_token_len_per_side**0.5) for image_aux_token_len_per_side in image_aux_token_len_list]
-#     # insert the padding tokens to the places of image so we can embed them together
+
 #     for batch_idx, cur_input_ids in enumerate(input_ids):
 #         num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
 #         assert num_images == 1, num_images
@@ -1419,36 +1336,40 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, imag
 #         cur_attention_mask = attention_mask[batch_idx]
 #         index = 0
 #         for i in range(len(image_token_indices) - 1):
-#             # still keep the first image token in input_ids for further use
 #             cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]+1])
 #             cur_labels_im_replaced.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
-#             cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
-#             cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_indices[i+1]-(image_token_indices[i]+1), dtype=torch.long, device=cur_input_ids.device))
-#             index += image_token_indices[i+1]-(image_token_indices[i]+1)
+
+#             if batch_idx % 2 == 0:
+#                 cur_attention_mask_im_replaced.append(torch.zeros_like(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]]))
+#             else:
+#                 cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
+                
+#             cur_position_ids_im_replaced.append(torch.arange(index, index + image_token_indices[i+1] - (image_token_indices[i] + 1), dtype=torch.long, device=cur_input_ids.device))
+#             index += image_token_indices[i+1] - (image_token_indices[i] + 1)
             
 #             if i < len(image_token_indices) - 2:
 #                 num_tokens_per_side = int(image_token_len**0.5)
 #                 image_token_len_with_newline = image_token_len + num_tokens_per_side
-#                 cur_input_ids_im_replaced.append(torch.full((image_token_len_with_newline-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
+#                 cur_input_ids_im_replaced.append(torch.full((image_token_len_with_newline - 1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
 #                 cur_labels_im_replaced.append(torch.full((image_token_len_with_newline,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
 
 #                 cur_im_attention_mask, cur_im_position_ids = prepare_image_info(image_size, image_token_len, newline=True)
 
 #                 for aux_i, image_aux_token_len_per_side in enumerate(image_aux_token_len_per_side_list):
 #                     assert image_aux_token_len_per_side >= base_image_token_len_per_side
-#                     num_base_crops_per_aux_side = image_aux_token_len_per_side//base_image_token_len_per_side
+#                     num_base_crops_per_aux_side = image_aux_token_len_per_side // base_image_token_len_per_side
 
 #                     cur_im_aux_attention_mask, _ = prepare_image_info(image_size, image_aux_token_len_per_side**2)
 #                     cur_im_aux_attention_mask = cur_im_aux_attention_mask.view(base_image_token_len_per_side, num_base_crops_per_aux_side, base_image_token_len_per_side, num_base_crops_per_aux_side)
-#                     cur_im_aux_attention_mask = cur_im_aux_attention_mask.permute(0, 2, 1, 3).contiguous().flatten(0,1).flatten(1,2)
+#                     cur_im_aux_attention_mask = cur_im_aux_attention_mask.permute(0, 2, 1, 3).contiguous().flatten(0, 1).flatten(1, 2)
 #                     cur_im_aux_attention_mask[cur_im_aux_attention_mask.sum(dim=1) == 0] = True
 #                     im_aux_attention_masks_list[aux_i].append(cur_im_aux_attention_mask)
 #                 cur_im_position_ids += index
                 
-#                 if cur_attention_mask[image_token_indices[i+1]]:
+#                 if cur_attention_mask[image_token_indices[i + 1]]:
 #                     cur_attention_mask_im_replaced.append(cur_im_attention_mask)
 #                     cur_position_ids_im_replaced.append(cur_im_position_ids.to(torch.long))
-#                     index = cur_im_position_ids.max()+1
+#                     index = cur_im_position_ids.max() + 1
 #                 else:
 #                     num_tokens_per_side = int(image_token_len**0.5)
 #                     image_token_len_with_newline = image_token_len + num_tokens_per_side
@@ -1460,7 +1381,7 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, imag
 #         attention_mask_im_replaced.append(torch.cat(cur_attention_mask_im_replaced))
 #         position_ids_im_replaced.append(torch.cat(cur_position_ids_im_replaced))
     
-#     # Truncate sequences to max length as image embeddings can make the sequence longer
+#     # Truncate sequences to max length
 #     new_input_ids = [x[0:max_length] for x in input_ids_im_replaced]
 #     new_labels = [x[0:max_length] for x in labels_im_replaced]
 #     new_attention_mask = [x[0:max_length] for x in attention_mask_im_replaced]
@@ -1471,6 +1392,85 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, imag
 #     new_position_ids = torch.stack(new_position_ids)
 #     im_aux_attention_masks_list = [torch.stack(im_aux_attention_masks) for im_aux_attention_masks in im_aux_attention_masks_list]
 #     return new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list
+
+
+def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len=576, image_aux_token_len_list=[192*192], max_length=2048):
+    input_ids_im_replaced = []
+    labels_im_replaced = []
+    attention_mask_im_replaced = []
+    position_ids_im_replaced = []
+    im_aux_attention_masks_list = [[] for _ in range(len(image_aux_token_len_list))]
+    base_image_token_len_per_side = int(image_token_len**0.5)
+    image_aux_token_len_per_side_list = [int(image_aux_token_len_per_side**0.5) for image_aux_token_len_per_side in image_aux_token_len_list]
+    # insert the padding tokens to the places of image so we can embed them together
+    for batch_idx, cur_input_ids in enumerate(input_ids):
+        num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
+        assert num_images == 1, num_images
+        image_size = image_sizes[batch_idx]
+        
+        image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
+
+        cur_input_ids_im_replaced = []
+        cur_labels_im_replaced = []
+        cur_attention_mask_im_replaced = []
+        cur_position_ids_im_replaced = []
+        
+        cur_labels = labels[batch_idx]
+        cur_attention_mask = attention_mask[batch_idx]
+        index = 0
+        for i in range(len(image_token_indices) - 1):
+            # still keep the first image token in input_ids for further use
+            cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]+1])
+            cur_labels_im_replaced.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
+            cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
+            cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_indices[i+1]-(image_token_indices[i]+1), dtype=torch.long, device=cur_input_ids.device))
+            index += image_token_indices[i+1]-(image_token_indices[i]+1)
+            
+            if i < len(image_token_indices) - 2:
+                num_tokens_per_side = int(image_token_len**0.5)
+                image_token_len_with_newline = image_token_len + num_tokens_per_side
+                cur_input_ids_im_replaced.append(torch.full((image_token_len_with_newline-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
+                cur_labels_im_replaced.append(torch.full((image_token_len_with_newline,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
+
+                cur_im_attention_mask, cur_im_position_ids = prepare_image_info(image_size, image_token_len, newline=True)
+
+                for aux_i, image_aux_token_len_per_side in enumerate(image_aux_token_len_per_side_list):
+                    assert image_aux_token_len_per_side >= base_image_token_len_per_side
+                    num_base_crops_per_aux_side = image_aux_token_len_per_side//base_image_token_len_per_side
+
+                    cur_im_aux_attention_mask, _ = prepare_image_info(image_size, image_aux_token_len_per_side**2)
+                    cur_im_aux_attention_mask = cur_im_aux_attention_mask.view(base_image_token_len_per_side, num_base_crops_per_aux_side, base_image_token_len_per_side, num_base_crops_per_aux_side)
+                    cur_im_aux_attention_mask = cur_im_aux_attention_mask.permute(0, 2, 1, 3).contiguous().flatten(0,1).flatten(1,2)
+                    cur_im_aux_attention_mask[cur_im_aux_attention_mask.sum(dim=1) == 0] = True
+                    im_aux_attention_masks_list[aux_i].append(cur_im_aux_attention_mask)
+                cur_im_position_ids += index
+                
+                if cur_attention_mask[image_token_indices[i+1]]:
+                    cur_attention_mask_im_replaced.append(cur_im_attention_mask)
+                    cur_position_ids_im_replaced.append(cur_im_position_ids.to(torch.long))
+                    index = cur_im_position_ids.max()+1
+                else:
+                    num_tokens_per_side = int(image_token_len**0.5)
+                    image_token_len_with_newline = image_token_len + num_tokens_per_side
+                    cur_attention_mask_im_replaced.append(torch.full((image_token_len_with_newline,), 0, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
+                    cur_position_ids_im_replaced.append(torch.full((image_token_len_with_newline,), 0, device=cur_input_ids.device, dtype=torch.long))
+        
+        input_ids_im_replaced.append(torch.cat(cur_input_ids_im_replaced))
+        labels_im_replaced.append(torch.cat(cur_labels_im_replaced))
+        attention_mask_im_replaced.append(torch.cat(cur_attention_mask_im_replaced))
+        position_ids_im_replaced.append(torch.cat(cur_position_ids_im_replaced))
+    
+    # Truncate sequences to max length as image embeddings can make the sequence longer
+    new_input_ids = [x[0:max_length] for x in input_ids_im_replaced]
+    new_labels = [x[0:max_length] for x in labels_im_replaced]
+    new_attention_mask = [x[0:max_length] for x in attention_mask_im_replaced]
+    new_position_ids = [x[0:max_length] for x in position_ids_im_replaced]
+    new_input_ids = torch.stack(new_input_ids)
+    new_labels = torch.stack(new_labels)
+    new_attention_mask = torch.stack(new_attention_mask)
+    new_position_ids = torch.stack(new_position_ids)
+    im_aux_attention_masks_list = [torch.stack(im_aux_attention_masks) for im_aux_attention_masks in im_aux_attention_masks_list]
+    return new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list
 
 
 @dataclass
