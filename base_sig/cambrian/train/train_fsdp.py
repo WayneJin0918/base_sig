@@ -1510,55 +1510,56 @@ class DataCollatorForSupervisedDataset(object):
         labels = torch.stack(labels)
         attention_mask = input_ids.ne(self.tokenizer.pad_token_id)
         # insert dummy image
-        # for i in range(len(input_ids)):
-            # if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
-            #     cur_input_ids_tmp = input_ids[i].clone()
-            #     cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
-            #     cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
-            #     input_ids[i] = cur_input_ids_tmp
-
-            #     cur_labels_tmp = labels[i].clone()
-            #     cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
-            #     cur_labels_tmp[image_position] = IGNORE_INDEX
-            #     labels[i] = cur_labels_tmp
-
-            #     cur_attention_mask_tmp = attention_mask[i].clone()
-            #     cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
-            #     cur_attention_mask_tmp[image_position] = False
-            #     attention_mask[i] = cur_attention_mask_tmp
         for i in range(len(input_ids)):
-            if i % 2 == 1:
-                if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
-                    cur_input_ids_tmp = input_ids[i].clone()
-                    cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
-                    cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
-                    input_ids[i] = cur_input_ids_tmp
+            if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
+                cur_input_ids_tmp = input_ids[i].clone()
+                cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
+                cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
+                input_ids[i] = cur_input_ids_tmp
+
+                cur_labels_tmp = labels[i].clone()
+                cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
+                cur_labels_tmp[image_position] = IGNORE_INDEX
+                labels[i] = cur_labels_tmp
+
+                cur_attention_mask_tmp = attention_mask[i].clone()
+                cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
+                cur_attention_mask_tmp[image_position] = False
+                attention_mask[i] = cur_attention_mask_tmp
+        
+        # for i in range(len(input_ids)):
+        #     if i % 2 == 1:
+        #         if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
+        #             cur_input_ids_tmp = input_ids[i].clone()
+        #             cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
+        #             cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
+        #             input_ids[i] = cur_input_ids_tmp
                 
-                    cur_labels_tmp = labels[i].clone()
-                    cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
-                    cur_labels_tmp[image_position] = IGNORE_INDEX
-                    labels[i] = cur_labels_tmp
+        #             cur_labels_tmp = labels[i].clone()
+        #             cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
+        #             cur_labels_tmp[image_position] = IGNORE_INDEX
+        #             labels[i] = cur_labels_tmp
             
-                    cur_attention_mask_tmp = attention_mask[i].clone()
-                    cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
-                    cur_attention_mask_tmp[image_position:image_position + image_token_len] = False
-                    attention_mask[i] = cur_attention_mask_tmp
-            else:
-                if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
-                    cur_input_ids_tmp = input_ids[i].clone()
-                    cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
-                    cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
-                    input_ids[i] = cur_input_ids_tmp
+        #             cur_attention_mask_tmp = attention_mask[i].clone()
+        #             cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
+        #             cur_attention_mask_tmp[image_position:image_position + image_token_len] = False
+        #             attention_mask[i] = cur_attention_mask_tmp
+        #     else:
+        #         if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
+        #             cur_input_ids_tmp = input_ids[i].clone()
+        #             cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
+        #             cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
+        #             input_ids[i] = cur_input_ids_tmp
         
-                    cur_labels_tmp = labels[i].clone()
-                    cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
-                    cur_labels_tmp[image_position] = IGNORE_INDEX
-                    labels[i] = cur_labels_tmp
+        #             cur_labels_tmp = labels[i].clone()
+        #             cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
+        #             cur_labels_tmp[image_position] = IGNORE_INDEX
+        #             labels[i] = cur_labels_tmp
         
-                    cur_attention_mask_tmp = attention_mask[i].clone()
-                    cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
-                    cur_attention_mask_tmp[image_position] = False
-                    attention_mask[i] = cur_attention_mask_tmp
+        #             cur_attention_mask_tmp = attention_mask[i].clone()
+        #             cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
+        #             cur_attention_mask_tmp[image_position] = False
+        #             attention_mask[i] = cur_attention_mask_tmp
             
         image_sizes = [instance['image_size'] for instance in instances]
         new_input_ids, new_labels, new_attention_mask, new_position_ids, im_aux_attention_masks_list = prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len, image_aux_token_len_list, max_length)
