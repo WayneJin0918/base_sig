@@ -264,9 +264,12 @@ class CambrianTrainer(Trainer):
         batch_size = inputs['labels'].size(0)
         
         indices = torch.arange(batch_size).to(self.args.device)
-        indices_to_modify = indices[indices % 2 == 1]
-
-        # inputs['attention_mask'][indices_to_modify, :575] = 0
+        indices_to_modify = (indices % 2 == 1)  
+    
+        attention_mask_copy = inputs['attention_mask'].clone()
+        attention_mask_copy[indices_to_modify, :575] = False
+        inputs['attention_mask'] = attention_mask_copy
+    
         model.train()
         inputs = self._prepare_inputs(inputs)
 
