@@ -100,7 +100,7 @@ TRAIN_ARGS="
     --fsdp full_shard \
     --fsdp_config fsdp_config.json \
     --dpo True \
-    --beta 0.2 \
+    --beta 0.05 \
     --noise_level [0,0] \
     --noise_type random_mask\
 "
