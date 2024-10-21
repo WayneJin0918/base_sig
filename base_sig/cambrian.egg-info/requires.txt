@@ -1,5 +1,5 @@
-torch==2.2.0
-torchvision==0.17.0
+torch==2.5.0
+torchvision==0.20
 transformers==4.37.0
 tokenizers==0.15.0
 sentencepiece==0.1.99
@@ -19,7 +19,7 @@ einops-exts==0.0.4
 timm==0.9.16
 open_clip_torch
 diffusers[torch]
-torchtext==0.17.0
+torchtext==0.18.0
 ezcolorlog
 gcsfs
 
