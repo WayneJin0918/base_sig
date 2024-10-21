@@ -260,14 +260,14 @@ class CambrianTrainer(Trainer):
 
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
-        inputs = self._prepare_inputs(inputs)
-        batch_size = inputs['labels'].size(0)
+        # inputs = self._prepare_inputs(inputs)
+        # batch_size = inputs['labels'].size(0)
            
-        attention_mask_copy = inputs['attention_mask'].clone()
+        # attention_mask_copy = inputs['attention_mask'].clone()
         
-        attention_mask_copy[1, :575] = False
-        attention_mask_copy[3, :575] = False
-        inputs['attention_mask'] = attention_mask_copy
+        # attention_mask_copy[1, :575] = False
+        # attention_mask_copy[3, :575] = False
+        # inputs['attention_mask'] = attention_mask_copy
 
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
