@@ -1510,7 +1510,7 @@ class DataCollatorForSupervisedDataset(object):
         labels = torch.stack(labels)
         attention_mask = input_ids.ne(self.tokenizer.pad_token_id)
         # insert dummy image
-        for i in range(len(input_ids)):
+        # for i in range(len(input_ids)):
             # if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
             #     cur_input_ids_tmp = input_ids[i].clone()
             #     cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
