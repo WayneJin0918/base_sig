@@ -847,7 +847,9 @@ class CambrianTrainer(Trainer):
                    policy_rejected_logps: torch.FloatTensor,
                    beta: float,
                    gamma: float) -> torch.FloatTensor:
-        diff =  beta *policy_chosen_logps - beta *policy_rejected_logps
+        normalized_chosen_logps = policy_chosen_logps
+        normalized_rejected_logps = policy_rejected_logps
+        diff =  beta *normalized_chosen_logps - beta *normalized_rejected_logps
         losses = -F.logsigmoid(diff)
         
         return losses
