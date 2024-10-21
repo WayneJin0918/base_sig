@@ -85,7 +85,7 @@ TRAIN_ARGS="
     --save_strategy steps \
     --save_steps 1000 \
     --save_total_limit 1 \
-    --learning_rate 1e-6 \
+    --learning_rate 5e-6 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type cosine \
@@ -100,7 +100,7 @@ TRAIN_ARGS="
     --fsdp full_shard \
     --fsdp_config fsdp_config.json \
     --dpo True \
-    --beta 1 \
+    --beta 0.2 \
     --noise_level [0,0] \
     --noise_type random_mask\
 "
