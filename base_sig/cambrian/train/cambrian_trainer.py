@@ -266,7 +266,7 @@ class CambrianTrainer(Trainer):
         indices = torch.arange(batch_size).to(self.args.device)
         indices_to_modify = indices[indices % 2 == 1]
 
-        inputs['attention_mask'][indices_to_modify, :575] = 0
+        # inputs['attention_mask'][indices_to_modify, :575] = 0
         model.train()
         inputs = self._prepare_inputs(inputs)
 
