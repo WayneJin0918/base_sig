@@ -260,7 +260,7 @@ class CambrianTrainer(Trainer):
 
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         model.train()
-        # inputs = self._prepare_inputs(inputs)
+        inputs = self._prepare_inputs(inputs)
         # batch_size = inputs['labels'].size(0)
            
         # attention_mask_copy = inputs['attention_mask'].clone()
