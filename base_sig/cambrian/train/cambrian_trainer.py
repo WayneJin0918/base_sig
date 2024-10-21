@@ -269,9 +269,6 @@ class CambrianTrainer(Trainer):
         attention_mask_copy = inputs['attention_mask'].clone()
         attention_mask_copy[indices_to_modify, :575] = False
         inputs['attention_mask'] = attention_mask_copy
-    
-        model.train()
-        inputs = self._prepare_inputs(inputs)
 
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
